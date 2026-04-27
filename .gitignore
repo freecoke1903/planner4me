@@ -1,0 +1,38 @@
+# OS / 시스템 파일
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 에디터 / IDE 설정
+.vscode/
+.idea/
+*.swp
+*~
+
+# Claude Code 로컬 설정 (개인 환경 정보)
+.claude/
+
+# 환경 변수 / 비밀 정보
+.env
+.env.local
+.env.*.local
+*.key
+secrets.json
+
+# Firebase CLI 로그 / 캐시
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# Node.js (혹시 나중에 추가될 경우)
+node_modules/
+npm-debug.log*
+
+# 백업 파일
+*.bak
+*.backup
+*.old
+
+# 로그
+*.log
