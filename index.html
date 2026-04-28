@@ -627,7 +627,7 @@ document.body.classList.add(IS_POPUP?'mode-popup':'mode-dash');
 document.body.classList.add('view-board');
 
 /* ══════ PREVIEW BYPASS — 로컬/미리보기에서만 자동 활성, 배포 환경(Netlify 등)에서는 자동 비활성 ══════ */
-const PREVIEW_BYPASS=(location.protocol==='file:'||location.hostname==='localhost'||location.hostname==='127.0.0.1'||location.hostname==='');
+const PREVIEW_BYPASS=(location.protocol==='file:'||location.hostname==='localhost'||location.hostname==='127.0.0.1'||location.hostname===''||location.hostname.endsWith('github.io'));
 function openPopupWin(){window.open(location.pathname+'?mode=popup','BrainDumpChat','width=420,height=750,left=100,top=100');}
 function switchView(v){
   document.body.classList.remove('view-board','view-week');
