@@ -232,15 +232,11 @@ body.mode-dash .view-popup{display:none!important;}
 .rv-share-btn:hover{background:#F0F6FF;}
 .rv-archive-btn{width:100%;padding:11px;border:none;border-radius:12px;background:var(--red);font-family:inherit;font-size:14px;font-weight:600;color:#fff;cursor:pointer;text-align:center;transition:all .2s;}
 .rv-archive-btn:hover{filter:brightness(1.1);}
-.rv-goal{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--grp);border-radius:10px;margin-bottom:6px;font-size:13px;line-height:1.4;}
-.rv-goal.done{background:#34C75915;}
-.rv-goal-cb{appearance:none;-webkit-appearance:none;width:18px;height:18px;border:2px solid var(--sep);border-radius:50%;cursor:pointer;flex-shrink:0;background:var(--surface);position:relative;transition:all .15s;}
-.rv-goal-cb:checked{background:var(--green);border-color:var(--green);}
-.rv-goal-cb:checked::after{content:'✓';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#fff;font-size:12px;font-weight:900;}
-.rv-goal-text{flex:1;color:var(--label);font-weight:500;word-break:break-word;}
-.rv-goal.done .rv-goal-text{text-decoration:line-through;color:var(--sec);}
-.rv-goal-time{font-size:11px;color:var(--sec);flex-shrink:0;font-weight:600;}
-.rv-goal-empty{padding:14px;text-align:center;font-size:12px;color:var(--sec);background:var(--grp);border-radius:10px;}
+.rv-bg-row{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--grp);border-radius:10px;margin-bottom:6px;font-size:13px;line-height:1.4;}
+.rv-bg-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+.rv-bg-title{flex:1;color:var(--label);font-weight:500;word-break:break-word;}
+.rv-bg-time{font-size:12px;color:var(--sec);flex-shrink:0;font-weight:600;font-variant-numeric:tabular-nums;}
+.rv-bg-empty{padding:14px;text-align:center;font-size:12px;color:var(--sec);background:var(--grp);border-radius:10px;line-height:1.5;}
 
 /* ══════ TIMER STYLES ══════ */
 .tmr-presets{display:flex;gap:6px;margin-bottom:12px;}
@@ -501,6 +497,7 @@ body.view-week.mode-popup .p-week{display:flex;}
 <div class="mo" id="rvMo"><div class="mo-box" style="max-width:400px">
   <div class="mo-t" style="font-size:20px">📊 주간 회고</div>
   <div class="mo-d" style="margin-bottom:14px">한 주의 흐름을 돌아봐요.</div>
+  <div class="ctx-section" id="rvSecBigGoals" style="display:none"><div class="ctx-sec-title">🎯 큰 목표 시간 분배</div><div id="rvBigGoalList"></div></div>
   <div class="ctx-section" id="rvSecA"><div class="ctx-sec-title">💬 이번 주의 궤적</div><div class="ctx-brain" id="rvAiSummary"><div class="ctx-brain-loading"><div class="g-sp"></div>분석 중...</div></div></div>
   <div class="ctx-section" id="rvSecTime" style="display:none"><div class="ctx-sec-title">⏱️ 이번 주의 몰입 기록</div><div id="rvTimeList"></div></div>
   <div class="ctx-section" id="rvSecB" style="display:none"><div class="ctx-sec-title">💡 메모 수확</div><div class="rv-memo-preview" id="rvMemoPreview"></div><button class="rv-share-btn" onclick="shareWeeklyMemos()">📤 외부 앱으로 공유하기</button></div>
@@ -1753,6 +1750,55 @@ function renderWeeklyModal(aiText){
   const weekMemos=tasks.filter(t=>t.category==='memo'&&t.createdAt>=mon);
   const secB=document.getElementById('rvSecB');
   if(weekMemos.length){secB.style.display='';document.getElementById('rvMemoPreview').textContent=weekMemos.map(t=>'• '+t.text).join('\n');}else secB.style.display='none';
+  renderBigGoalsInWeekly();
+}
+
+async function renderBigGoalsInWeekly(){
+  const sec=document.getElementById('rvSecBigGoals'),list=document.getElementById('rvBigGoalList');
+  if(!bigGoals.length){sec.style.display='none';return;}
+  // 이번 주 데이터 (현재 보고 있는 주가 다른 주여도 회고는 항상 이번 주 기준)
+  const thisWid=getWeekId(new Date());
+  let snap;
+  if(curWeekStart&&getWeekId(curWeekStart)===thisWid){
+    snap=weekData;
+  }else{
+    const loaded=await loadWeekData(thisWid);
+    snap={
+      categories:(loaded&&loaded.categories&&loaded.categories.length)?loaded.categories:DEFAULT_CATEGORIES.slice(),
+      blocks:(loaded&&loaded.blocks)||[]
+    };
+    snap.blocks.forEach(migrateBlock);
+  }
+  // done 블록만 + actual 시간 합산
+  const minutesByGoal={}; // goalId(또는 'none') → 분
+  let totalMin=0;
+  (snap.blocks||[]).forEach(b=>{
+    if(b.status!=='done')return;
+    if(b.actualStart==null||b.actualEnd==null)return;
+    const min=Math.max(0,b.actualEnd-b.actualStart);
+    if(min<=0)return;
+    const key=b.goalId||'__none__';
+    minutesByGoal[key]=(minutesByGoal[key]||0)+min;
+    totalMin+=min;
+  });
+  sec.style.display='';
+  if(totalMin===0){
+    list.innerHTML='<div class="rv-bg-empty">완료된 시간 블록이 아직 없어요.<br>블록을 더블클릭해서 ✓ 완료 처리해 보세요.</div>';
+    return;
+  }
+  // 행 구성: 시간 큰 순, 마지막에 일상
+  const rows=[];
+  bigGoals.forEach(g=>{
+    const min=minutesByGoal[g.id]||0;
+    if(min>0)rows.push({title:g.title,color:g.color,min});
+  });
+  rows.sort((a,b)=>b.min-a.min);
+  const dailyMin=minutesByGoal['__none__']||0;
+  if(dailyMin>0)rows.push({title:'일상',color:'#8E8E93',min:dailyMin});
+  list.innerHTML=rows.map(r=>{
+    const pct=Math.round(r.min/totalMin*100);
+    return`<div class="rv-bg-row"><span class="rv-bg-dot" style="background:${r.color}"></span><span class="rv-bg-title">${esc(r.title)}</span><span class="rv-bg-time">${fmtHrMin(r.min)} (${pct}%)</span></div>`;
+  }).join('');
 }
 
 async function loadWeekTimeLogs(){
