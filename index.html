@@ -240,6 +240,10 @@ body.mode-dash .view-popup{display:none!important;}
 .rv-share-btn:hover{background:#F0F6FF;}
 .rv-archive-btn{width:100%;padding:11px;border:none;border-radius:12px;background:var(--red);font-family:inherit;font-size:14px;font-weight:600;color:#fff;cursor:pointer;text-align:center;transition:all .2s;}
 .rv-archive-btn:hover{filter:brightness(1.1);}
+.rv-placeholder{font-size:13px;color:var(--sec);font-style:italic;font-weight:400;}
+.rv-memo-ta{width:100%;padding:12px 14px;border:1px solid var(--sep);border-radius:12px;font-family:inherit;font-size:13.5px;line-height:1.6;color:var(--label);outline:none;background:var(--grp);resize:vertical;min-height:80px;max-height:240px;transition:border-color .2s;}
+.rv-memo-ta:focus{border-color:var(--blue);background:var(--surface);}
+.rv-memo-ta:disabled{cursor:not-allowed;opacity:.7;}
 .rv-hdr{margin:-4px -2px 14px;padding-bottom:12px;border-bottom:1px solid var(--sep);}
 .rv-hdr-title{font-size:20px;font-weight:700;color:var(--label);margin-bottom:4px;}
 .rv-hdr-week{font-size:12px;color:var(--sec);font-weight:600;letter-spacing:.2px;}
@@ -506,7 +510,11 @@ body.view-week.mode-popup .p-week{display:flex;}
     <div class="rv-hdr-week" id="rvWeekLabel"></div>
   </div>
   <div class="ctx-section" id="rvSecBigGoals" style="display:none"><div class="ctx-sec-title">🎯 큰 목표 시간 분배</div><div id="rvBigGoalList"></div></div>
-  <div class="ctx-section" id="rvSecA"><div class="ctx-sec-title">💬 이번 주의 궤적</div><div class="ctx-brain" id="rvAiSummary"><div class="ctx-brain-loading"><div class="g-sp"></div>분석 중...</div></div></div>
+  <div class="ctx-section" id="rvSecMirror"><div class="ctx-sec-title">🪞 거울 — 자기 인식</div><div class="ctx-brain" id="rvMirror"><div class="rv-placeholder">분석 활성화 후 표시됩니다</div></div></div>
+  <div class="ctx-section" id="rvSecCompare"><div class="ctx-sec-title">🔄 비교 — 시간 흐름</div><div class="ctx-brain" id="rvCompare"><div class="rv-placeholder">분석 활성화 후 표시됩니다</div></div></div>
+  <div class="ctx-section" id="rvSecConnect"><div class="ctx-sec-title">🔗 연결 — 데이터 간 관계</div><div class="ctx-brain" id="rvConnect"><div class="rv-placeholder">분석 활성화 후 표시됩니다</div></div></div>
+  <div class="ctx-section" id="rvSecRecord"><div class="ctx-sec-title">📝 기록 — 메타 정보</div><div class="ctx-brain" id="rvRecord"><div class="rv-placeholder">분석 활성화 후 표시됩니다</div></div></div>
+  <div class="ctx-section" id="rvSecMemo"><div class="ctx-sec-title">✏️ 회고 메모</div><textarea class="rv-memo-ta" id="rvMemoInput" placeholder="이번 주 본인의 한 줄 회고를 적어보세요. (저장은 다음 단계에서 활성화 예정)" disabled></textarea></div>
   <div class="ctx-section" id="rvSecTime" style="display:none"><div class="ctx-sec-title">⏱️ 이번 주의 몰입 기록</div><div id="rvTimeList"></div></div>
   <div class="ctx-section" id="rvSecB" style="display:none"><div class="ctx-sec-title">💡 메모 수확</div><div class="rv-memo-preview" id="rvMemoPreview"></div><button class="rv-share-btn" onclick="shareWeeklyMemos()">📤 외부 앱으로 공유하기</button></div>
   <div class="ctx-section" id="rvSecC"><div class="ctx-sec-title">📦 시스템 리셋</div><p style="font-size:13px;color:var(--sec);line-height:1.5;margin-bottom:10px">남은 항목들을 보관함으로 보내고 뇌를 비우세요.</p><button class="rv-archive-btn" onclick="archiveLeftovers()">📦 미완료 &amp; 메모 모두 보관함으로</button></div>
@@ -1896,11 +1904,11 @@ document.getElementById('ctxMo').addEventListener('click',e=>{if(e.target===e.cu
 async function autoDemoteOldTasks(){try{const todayISO=getTodayISO(),todayStart=todayISO+'T00:00:00';const targets=tasks.filter(t=>{if(t.done)return false;if(t.category==='today'&&t.createdAt<todayStart)return true;if(t.category==='scheduled'&&t.target_date&&t.target_date<todayISO)return true;return false;});if(!targets.length)return;const b=db.batch();for(const t of targets){b.update(db.collection('tasks').doc(t.id),{category:'someday'});t.category='someday';}await b.commit();}catch(e){console.error('[autoDemote]',e);}}
 
 /* ══════════════════════════════════════════════
-   WEEKLY — 캐싱 + TimeLogs
+   WEEKLY — TimeLogs (AI 4역할은 v16 Step 4에서 weeklyArchive 기반으로 구현 예정)
    ══════════════════════════════════════════════ */
-function weeklyCacheKey(){return'weekly_summary_v2_'+wkK(new Date());}
 
-function renderWeeklyModal(aiText){
+function renderWeeklyModal(){
+  // v16: AI 4역할은 Step 4에서 구현. 지금은 placeholder만.
   const monday=monWk(new Date()),mon=monday.toISOString();
   // 헤더의 주차 라벨
   const wkLabel=document.getElementById('rvWeekLabel');
@@ -1908,8 +1916,7 @@ function renderWeeklyModal(aiText){
     const sun=new Date(monday);sun.setDate(sun.getDate()+6);
     wkLabel.textContent=`${monday.getFullYear()}년 ${monday.getMonth()+1}/${monday.getDate()} – ${sun.getMonth()+1}/${sun.getDate()}`;
   }
-  const aiEl=document.getElementById('rvAiSummary');
-  if(aiText){aiEl.classList.add('rv-ai');aiEl.innerHTML=aiText;}else if(gk())aiEl.innerHTML='<div class="ctx-brain-loading"><div class="g-sp"></div>분석 중...</div>';else aiEl.innerHTML='<p>이번 주는 데이터가 부족해요.</p>';
+  // 메모 수확
   const weekMemos=tasks.filter(t=>t.category==='memo'&&t.createdAt>=mon);
   const secB=document.getElementById('rvSecB');
   if(weekMemos.length){secB.style.display='';document.getElementById('rvMemoPreview').textContent=weekMemos.map(t=>'• '+t.text).join('\n');}else secB.style.display='none';
@@ -1988,68 +1995,14 @@ async function checkWeekly(){try{
   if(!((dy===0&&hr>=18)||dy===1))return;
   const wk=wkK(n);if(uGet('weekly_review')===wk)return;uSet('weekly_review',wk);
   const mon=monWk(n).toISOString();const weekTasks=tasks.filter(t=>t.createdAt>=mon||(t.doneAt&&t.doneAt>=mon));if(!weekTasks.length)return;
-  const ck=weeklyCacheKey();let cached=uGet(ck);renderWeeklyModal(cached||null);
-  const wLogs=await loadWeekTimeLogs();renderTimeLogsInWeekly(wLogs);
-  document.getElementById('rvMo').classList.add('open');
-  if(!cached&&gk()&&weekTasks.length){const s=await callWeeklySummaryAI(weekTasks);uSet(ck,s);const el=document.getElementById('rvAiSummary');el.classList.add('rv-ai');el.innerHTML=s;}
+  await openWeeklyManual();
 }catch(e){console.error('[checkWeekly]',e);}}
 
 async function openWeeklyManual(){
-  const ck=weeklyCacheKey();let cached=uGet(ck);renderWeeklyModal(cached||null);
+  // v16: AI 4역할은 Step 4에서 구현 예정. 지금은 데이터 섹션과 placeholder만.
+  renderWeeklyModal();
   const wLogs=await loadWeekTimeLogs();renderTimeLogsInWeekly(wLogs);
   document.getElementById('rvMo').classList.add('open');
-  if(!cached&&gk()){const mon=monWk(new Date()).toISOString();const wt=tasks.filter(t=>t.createdAt>=mon||(t.doneAt&&t.doneAt>=mon));const s=await callWeeklySummaryAI(wt);if(wt.length||s)uSet(ck,s);const el=document.getElementById('rvAiSummary');el.classList.add('rv-ai');el.innerHTML=s||'<p>이번 주 데이터가 없어요.</p>';}
-}
-
-async function callWeeklySummaryAI(taskArray){
-  if(!Array.isArray(taskArray))taskArray=[];
-  const safe=taskArray.filter(t=>t&&typeof t.text==='string'&&t.text.trim()).map(t=>({text:t.text.trim(),done:!!t.done}));
-  const done=safe.filter(t=>t.done).map(t=>t.text);
-  const rest=safe.filter(t=>!t.done).map(t=>t.text);
-  // 이번 주 시간 블록 + 큰 목표 데이터
-  const monday=monWk(new Date());
-  const blockSummary=await getWeekBlockSummary(monday);
-  const goalList=getUserGoals().map(g=>'- '+g.title).join('\n')||'(사용자 정의 큰 목표 없음 — 일상만)';
-  // 데이터 없으면 짧게 폴백
-  if(!safe.length&&blockSummary.totalMin===0)return'<p>이번 주는 기록된 데이터가 없어요. 다음 주는 메모 한 줄, 시간 블록 한 개라도 남겨보세요.</p>';
-  const userInput=`[큰 목표 리스트]
-${goalList}
-
-[이번 주 시간 블록 (큰 목표별, done 블록 실제 시간)]
-${blockSummary.lines}
-[총 ${fmtHrMin(blockSummary.totalMin)}]
-
-[이번 주 완료한 메모/할 일]
-${done.length?done.slice(0,15).map(t=>'- '+t).join('\n'):'(없음)'}
-
-[이번 주 남긴 메모/계획]
-${rest.length?rest.slice(0,15).map(t=>'- '+t).join('\n'):'(없음)'}`;
-  const sysPrompt=`너는 ADHD 사용자의 한 주를 데이터 기반으로 분석하는 코치야.
-주어진 데이터(큰 목표 리스트, 큰 목표별 시간 분배, 완료한 일, 남긴 메모)로 HTML 레포트를 작성해.
-
-규칙:
-- HTML 태그만 사용: <h4>, <p>, <strong>, <em>, <ul>, <li>
-- 평가성 표현 절대 금지: "잘했어요", "수고했어요", "대단해요", "훌륭해요", "최고예요"
-- 수치 인용 필수 (시간/퍼센트 구체적으로)
-- 직접적·분석적·코칭 톤
-- 큰 목표 명칭은 주어진 것만 그대로 사용 (추측해서 만들지 말 것)
-- 빈 데이터(예: 메모 없음)는 무시하고 있는 것만 분석
-
-구조 (4섹션 고정):
-<h4>핵심 성취</h4>
-<ul><li>구체적 성취 1~2개. 완료한 메모와 큰 목표 시간 분배에서 추출.</li></ul>
-
-<h4>큰 목표별 분석</h4>
-<p>가장 시간을 쓴 큰 목표 1~2개를 짚고, 균형을 한 줄로 평가. "WorldQuant IQC 통과에 12h(40%)로 가장 큰 비중을 두고 있습니다." 같은 톤.</p>
-
-<h4>관찰된 패턴</h4>
-<p>시간 분배에서 보이는 경향. 예: "한 목표에 60% 이상 쏠렸습니다", "일상이 50%를 차지해 큰 목표 시간이 부족해 보입니다", "큰 목표 X에는 시간이 거의 없습니다".</p>
-
-<h4>다음 주 제안</h4>
-<p>구체적 행동 1~2개. 명령조 OK. 예: "큰 목표 X에 최소 N시간 블록을 잡으세요".</p>
-
-전체 14줄 이내, 마크다운 백틱 금지.`;
-  try{const res=await fetch('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${gk()}`},body:JSON.stringify({model:'gpt-4o-mini',messages:[{role:'system',content:sysPrompt},{role:'user',content:userInput}],temperature:0.4,max_tokens:700})});if(!res.ok)throw new Error();const d=await res.json();return d.choices?.[0]?.message?.content?.trim()||'<p>요약을 가져올 수 없었어요.</p>';}catch(e){console.error('[callWeeklySummaryAI]',e);return'<p>요약을 가져올 수 없었어요.</p>';}
 }
 
 async function shareWeeklyMemos(){const mon=monWk(new Date()).toISOString();const memos=tasks.filter(t=>t.category==='memo'&&t.createdAt>=mon);if(!memos.length){showToast('공유할 메모 없음');return;}const text='🧠 이번 주 Brain Dump 메모\n\n'+memos.map(t=>'• '+t.text).join('\n');if(navigator.share){try{await navigator.share({title:'이번 주 메모',text});}catch(e){if(e.name!=='AbortError')showToast('공유 실패');}}else{try{await navigator.clipboard.writeText(text);showToast('클립보드에 복사됨');}catch{showToast('복사 실패');}}}
