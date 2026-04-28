@@ -855,7 +855,6 @@ function renderWeekView(){
           <span class="wp-nav-label" id="wpNavLabel">${formatWeekLabel(curWeekStart)}</span>
           <button class="wp-nav-btn" onclick="navWeek(1)">다음주 ›</button>
           <button class="wp-nav-this" onclick="navWeek(0)">이번주</button>
-          <button class="wp-nav-btn" style="background:var(--blue);color:#fff" onclick="openNewBlockGlobal()">+ 블록</button>
         </div>
         <div class="wp-goals">${goalsHTML}</div>
       </div>
@@ -1123,13 +1122,6 @@ function openNewBlockMo(day,row){
   };
   document.getElementById('wpNewBlockMo').classList.add('open');
   setTimeout(()=>document.getElementById('wpNewTitle').focus(),120);
-}
-function openNewBlockGlobal(){
-  if(!curWeekStart)curWeekStart=monWk(new Date());
-  const now=new Date();
-  const dy=now.getDay(),day=dy===0?6:dy-1;
-  const row=Math.floor((now.getHours()*60+now.getMinutes())/30);
-  openNewBlockMo(day,row);
 }
 function closeNewBlockMo(){document.getElementById('wpNewBlockMo').classList.remove('open');}
 document.getElementById('wpNewBlockMo').addEventListener('click',e=>{if(e.target===e.currentTarget)closeNewBlockMo();});
