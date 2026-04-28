@@ -46,12 +46,17 @@ planner4me/
 
 ## ⚠️ 중요 제약사항 (반드시 준수)
 
-### 1) Private repo 유지 — Public 전환 금지
+### 1) 키 관리 — Firebase apiKey는 공개 OK, Firestore Rules가 진짜 보안
 
-`index.html` 안에 **Firebase 설정 키와 OpenAI API 키가 평문으로 들어있습니다.**
-공개되면 제3자가 데이터베이스에 접근하거나 OpenAI 크레딧을 소진시킬 수 있습니다.
-- 절대 Public으로 변경 금지
-- 키를 별도 환경변수로 빼는 작업은 백엔드를 도입해야 가능 — 사용자 명시 요청 시에만
+`index.html`에 **Firebase Web SDK config(apiKey 등)가 평문으로 들어 있습니다.**
+이는 Firebase 설계상 **공개 전제**의 식별자이며 비밀 키가 아닙니다.
+실제 데이터 보안은 **Firestore Security Rules**가 책임집니다 — 이 규칙이 uid 기반으로 잠겨 있어야 함(현재 잠겨 있음, Firebase Console에서 확인 가능).
+
+**OpenAI API 키는 코드에 없습니다.** 사용자가 설정 화면에서 본인 키를 입력하면 브라우저 localStorage(`braindump_<uid>_openai_key`)에 저장됩니다(`uSet('openai_key', ...)`). 따라서 repo가 Public이어도 키 노출 위험 없음.
+
+- Firebase apiKey를 별도 환경변수로 빼는 작업은 불필요 (오히려 동작 안 함)
+- Firestore Rules를 임의로 약화시키지 말 것 (예: `allow read, write: if true;` 절대 금지)
+- 백엔드 도입 시에만 OpenAI 키를 서버 측으로 옮기는 게 의미 있음 — 사용자 명시 요청 시에만
 
 ### 2) 단일 파일 아키텍처 유지
 
@@ -119,5 +124,7 @@ push 안 하면 다음 기기에서 이어 작업 불가.
 
 ## 참고
 
-- GitHub repo: https://github.com/freecoke1903/planner4me (Private)
+- GitHub repo: https://github.com/freecoke1903/planner4me (Public)
+  - Firebase apiKey는 노출돼도 안전(설계상 공개), 실제 보안은 Firestore Rules가 담당
+  - OpenAI 키는 사용자별 localStorage 저장이라 코드에 없음
 - Firebase project: `plannerforme-db9ac`
