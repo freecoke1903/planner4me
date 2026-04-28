@@ -546,22 +546,17 @@ body.view-week.mode-popup .p-week{display:flex;}
 <!-- Weekly Planner: New Block -->
 <div class="mo" id="wpNewBlockMo"><div class="mo-box" style="max-width:360px">
   <div class="mo-t">⏰ 새 블록</div>
-  <input class="mo-in" id="wpNewTitle" placeholder="지금 뭘 시작할까요?" style="font-family:inherit;font-size:17px;font-weight:600;margin-top:6px">
+  <input class="mo-in" id="wpNewTitle" placeholder="지금 뭘 시작할까요?" style="font-family:inherit;margin-top:6px">
   <div style="display:flex;gap:8px;margin-top:10px">
     <div style="flex:1"><label class="mo-lb">시작</label><input class="mo-in" id="wpNewStart" type="time" style="font-family:inherit"></div>
     <div style="flex:1"><label class="mo-lb">끝</label><input class="mo-in" id="wpNewEnd" type="time" style="font-family:inherit"></div>
   </div>
   <label class="mo-lb" style="margin-top:10px">카테고리</label>
   <select class="mo-in" id="wpNewCat" style="font-family:inherit"></select>
-  <details id="wpNewMore" style="margin-top:12px">
-    <summary style="cursor:pointer;font-size:13px;color:var(--blue);font-weight:600;list-style:none;padding:6px 0;user-select:none">▾ 상세 옵션</summary>
-    <label class="mo-lb" style="margin-top:6px">요일</label>
-    <select class="mo-in" id="wpNewDay" style="font-family:inherit"></select>
-    <label class="mo-lb" style="margin-top:10px">기존 카드 연결 (선택)</label>
-    <select class="mo-in" id="wpNewLink" style="font-family:inherit"></select>
-    <label class="mo-lb" style="margin-top:10px">기여 목표 (선택)</label>
-    <select class="mo-in" id="wpNewGoal" style="font-family:inherit"></select>
-  </details>
+  <label class="mo-lb" style="margin-top:10px">기존 카드 연결 (선택)</label>
+  <select class="mo-in" id="wpNewLink" style="font-family:inherit"></select>
+  <label class="mo-lb" style="margin-top:10px">기여 목표 (선택)</label>
+  <select class="mo-in" id="wpNewGoal" style="font-family:inherit"></select>
   <div class="mo-acts">
     <button class="mo-btn sec" onclick="closeNewBlockMo()">취소</button>
     <button class="mo-btn pri" onclick="confirmNewBlock()">추가</button>
@@ -1075,7 +1070,7 @@ function bindWeekDnD(container){
 
 const NEW_BLOCK_PLACEHOLDERS=[
   '오늘 목표랑 맞는 일인지 잠깐 체크',
-  '이거 진짜 지금 해야 하는 거 맞아요?',
+  '큰 목표에 한 걸음 다가가는 실행과제를!',
   '독서? 운동? 다만 목표 확인은 필수!',
   'SNS 말고 진짜 할 일로요',
   '30분짜리 가벼운 거라도 OK',
@@ -1089,19 +1084,14 @@ const NEW_BLOCK_PLACEHOLDERS=[
   '딴 거 말고 지금 진짜 할 거',
   '어차피 30분 후에 뭐 할지 까먹어요'
 ];
+let _newBlockDay=0;
 function openNewBlockMo(day,row){
+  _newBlockDay=day;
   const titleIn=document.getElementById('wpNewTitle');
   titleIn.value='';
   titleIn.placeholder=NEW_BLOCK_PLACEHOLDERS[Math.floor(Math.random()*NEW_BLOCK_PLACEHOLDERS.length)];
   document.getElementById('wpNewStart').value=fmtMin(row*30);
   document.getElementById('wpNewEnd').value=fmtMin(Math.min(row*30+60,1440));
-  // 요일 selector
-  const daySel=document.getElementById('wpNewDay');
-  const days=['월','화','수','목','금','토','일'];
-  daySel.innerHTML=days.map((d,i)=>{
-    const dt=new Date(curWeekStart);dt.setDate(dt.getDate()+i);
-    return`<option value="${i}" ${i===day?'selected':''}>${d} ${dt.getMonth()+1}/${dt.getDate()}</option>`;
-  }).join('');
   // 카테고리 (마지막에 쓴 카테고리 자동 선택, 없으면 첫 번째)
   const catSel=document.getElementById('wpNewCat');
   const lastCat=uGet('last_block_cat');
@@ -1109,8 +1099,6 @@ function openNewBlockMo(day,row){
   catSel.innerHTML=weekData.categories.map(c=>`<option value="${c.id}" ${c.id===defaultCatId?'selected':''}>${esc(c.name)}</option>`).join('');
   // 기여 목표
   fillGoalSelect(document.getElementById('wpNewGoal'),null);
-  // 상세 옵션은 항상 접힌 상태로 시작
-  const moreEl=document.getElementById('wpNewMore');if(moreEl)moreEl.open=false;
   // 카드 연결 (1:1: 이미 다른 블록에 연결된 카드 제외)
   const linkSel=document.getElementById('wpNewLink');
   const usedCardIds=new Set(weekData.blocks.filter(b=>b.cardId).map(b=>b.cardId));
@@ -1147,7 +1135,7 @@ document.getElementById('wpNewBlockMo').addEventListener('click',e=>{if(e.target
 async function confirmNewBlock(){
   const title=document.getElementById('wpNewTitle').value.trim();
   if(!title){showToast('제목을 입력하세요');return;}
-  const day=parseInt(document.getElementById('wpNewDay').value)||0;
+  const day=_newBlockDay;
   const start=parseTimeToMin(document.getElementById('wpNewStart').value);
   const endRaw=document.getElementById('wpNewEnd').value;
   let end=parseTimeToMin(endRaw);
