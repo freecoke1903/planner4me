@@ -679,6 +679,19 @@ function migrateBlock(b){
   return b;
 }
 
+// 일상 큰 목표가 로드된 후 goalId 없는/stale 블록을 일상으로 자동 채움
+// 변경 여부만 반환. 저장은 호출자가 결정.
+function ensureBlocksHaveGoal(blocks){
+  const daily=getDailyGoal();
+  if(!daily||!Array.isArray(blocks))return false;
+  let changed=false;
+  blocks.forEach(b=>{
+    const linked=b.goalId&&bigGoals.find(g=>g.id===b.goalId);
+    if(!linked){b.goalId=daily.id;changed=true;}
+  });
+  return changed;
+}
+
 async function loadAndRenderWeek(){
   if(!curWeekStart)curWeekStart=monWk(new Date());
   const wid=getWeekId(curWeekStart);
@@ -688,6 +701,7 @@ async function loadAndRenderWeek(){
     blocks:(loaded&&loaded.blocks)||[]
   };
   weekData.blocks.forEach(migrateBlock); // 기존 데이터 자동 마이그레이션
+  if(ensureBlocksHaveGoal(weekData.blocks))await saveWeekData(wid,weekData);
   renderWeekView();
 }
 
@@ -1108,7 +1122,7 @@ async function confirmNewBlock(){
   }
   const catId=document.getElementById('wpNewCat').value||weekData.categories[0].id;
   const cardId=document.getElementById('wpNewLink').value||null;
-  const goalId=document.getElementById('wpNewGoal').value||null;
+  const goalId=document.getElementById('wpNewGoal').value||(getDailyGoal()?.id||null);
   uSet('last_block_cat',catId); // 다음 블록 추가 시 기본값으로 사용
   weekData.blocks.push({
     id:'block-'+Date.now()+'-'+Math.floor(Math.random()*1000),
@@ -1147,7 +1161,7 @@ async function addBlock(b){
   weekData.blocks.push({
     id,day:b.day,startMin:b.startMin,endMin:b.endMin,
     title:b.title,categoryId:cat.id,cardId:b.cardId||null,
-    goalId:b.goalId||null,
+    goalId:b.goalId||(getDailyGoal()?.id||null),
     origin:b.origin||'planned',
     status:b.status||'pending',
     actualStart:b.actualStart!=null?b.actualStart:null,
@@ -1259,7 +1273,7 @@ async function saveCurBlock(){
   if(end<=start){showToast('끝 시간이 시작보다 늦어야 해요');return;}
   b.title=title;b.startMin=start;b.endMin=end;
   b.categoryId=document.getElementById('wpBlkCat').value;
-  b.goalId=document.getElementById('wpBlkGoal').value||null;
+  b.goalId=document.getElementById('wpBlkGoal').value||(getDailyGoal()?.id||null);
   const wasDone=b.status==='done';
   const willBeDone=document.getElementById('wpBlkDone').checked;
   b.status=willBeDone?'done':'pending';
@@ -1434,8 +1448,11 @@ async function loadBigGoalsListen(){
       // 첫 응답인데 일상이 없으면 자동 생성 (생성 후 onSnapshot이 다시 발화)
       if(!getDailyGoal()){await ensureDailyGoal();return;}
       renderBigGoals();
-      // 그리드 색/배지 갱신
-      if(curWeekStart)renderWeekView();
+      // 일상이 이제 막 들어왔을 수 있으니 현재 주 블록의 goalId 보정
+      if(curWeekStart&&Array.isArray(weekData.blocks)){
+        if(ensureBlocksHaveGoal(weekData.blocks))await saveWeekData(getWeekId(curWeekStart),weekData);
+        renderWeekView();
+      }
     },err=>{
       console.error('[bigGoals]',err);
       if(err.code==='permission-denied'){
@@ -1526,15 +1543,21 @@ function renderBigGoals(){
 }
 document.getElementById('bgGoalMo').addEventListener('click',e=>{if(e.target===e.currentTarget)closeBigGoalMo();});
 
-// 블록 모달용 큰 목표 셀렉터 채우기 (큰 목표 0개면 라벨/셀렉터 숨김)
+// 블록 모달용 큰 목표 셀렉터 채우기 (모든 블록은 큰 목표를 가져야 함)
+// 비어있는 selectedId면 일상이 자동 선택됨
 function fillBigGoalSelect(selId,lbId,selectedId){
   const sel=document.getElementById(selId),lb=document.getElementById(lbId);
   if(!sel||!lb)return;
   if(!bigGoals.length){lb.style.display='none';sel.style.display='none';sel.innerHTML='';return;}
   lb.style.display='';sel.style.display='';
-  let html='<option value="">— 없음 —</option>';
-  html+=bigGoals.map(g=>`<option value="${g.id}" ${g.id===selectedId?'selected':''}>${esc(g.title.length>30?g.title.slice(0,30)+'…':g.title)}</option>`).join('');
-  sel.innerHTML=html;
+  const daily=getDailyGoal();
+  const fallbackId=daily?daily.id:'';
+  // selectedId가 유효한 큰 목표를 가리키지 않으면 일상으로 폴백
+  const targetId=(selectedId&&bigGoals.find(g=>g.id===selectedId))?selectedId:fallbackId;
+  // 일상이 항상 마지막에 오도록 정렬 (사용자 정의 → 일상)
+  const userGoals=getUserGoals();
+  const ordered=daily?[...userGoals,daily]:userGoals;
+  sel.innerHTML=ordered.map(g=>`<option value="${g.id}" ${g.id===targetId?'selected':''}>${esc(g.title.length>30?g.title.slice(0,30)+'…':g.title)}</option>`).join('');
 }
 
 /* ══════════════════════════════════════════════
@@ -1985,6 +2008,8 @@ async function ensureWeekDataLoaded(d){
     categories:(loaded&&loaded.categories&&loaded.categories.length)?loaded.categories:DEFAULT_CATEGORIES.slice(),
     blocks:(loaded&&loaded.blocks)||[]
   };
+  weekData.blocks.forEach(migrateBlock);
+  if(ensureBlocksHaveGoal(weekData.blocks))await saveWeekData(wid,weekData);
 }
 
 async function saveTimerLog(){
