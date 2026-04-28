@@ -45,3 +45,4 @@ planner4me/
 ## 실행
 
 `index.html`을 브라우저로 열거나, 정적 호스팅(Firebase Hosting, Netlify, Vercel 등)에 배포해 사용합니다.
+
