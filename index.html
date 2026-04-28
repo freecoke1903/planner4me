@@ -550,8 +550,8 @@ body.view-week.mode-popup .p-week{display:flex;}
   <select class="mo-in" id="wpNewCat" style="font-family:inherit"></select>
   <label class="mo-lb" style="margin-top:10px">기존 카드 연결 (선택)</label>
   <select class="mo-in" id="wpNewLink" style="font-family:inherit"></select>
-  <label class="mo-lb" id="wpNewGoalLb" style="margin-top:10px;display:none">기여 목표 (선택)</label>
-  <select class="mo-in" id="wpNewGoal" style="font-family:inherit;display:none"></select>
+  <label class="mo-lb" id="wpNewGoalLb" style="margin-top:10px">큰 목표 (선택)</label>
+  <select class="mo-in" id="wpNewGoal" style="font-family:inherit"></select>
   <div class="mo-acts">
     <button class="mo-btn sec" onclick="closeNewBlockMo()">취소</button>
     <button class="mo-btn pri" onclick="confirmNewBlock()">추가</button>
@@ -581,8 +581,8 @@ body.view-week.mode-popup .p-week{display:flex;}
   </div>
   <label class="mo-lb" style="margin-top:10px">카테고리</label>
   <select class="mo-in" id="wpBlkCat" style="font-family:inherit"></select>
-  <label class="mo-lb" id="wpBlkGoalLb" style="margin-top:10px;display:none">기여 목표 (선택)</label>
-  <select class="mo-in" id="wpBlkGoal" style="font-family:inherit;display:none"></select>
+  <label class="mo-lb" id="wpBlkGoalLb" style="margin-top:10px">큰 목표 (선택)</label>
+  <select class="mo-in" id="wpBlkGoal" style="font-family:inherit"></select>
   <div id="wpBlkLink"></div>
   <div class="mo-acts">
     <button class="mo-btn dan" onclick="deleteCurBlock()" style="margin-right:auto">삭제</button>
@@ -1070,6 +1070,8 @@ function openNewBlockMo(day,row){
   const lastCat=uGet('last_block_cat');
   const defaultCatId=weekData.categories.find(c=>c.id===lastCat)?lastCat:weekData.categories[0].id;
   catSel.innerHTML=weekData.categories.map(c=>`<option value="${c.id}" ${c.id===defaultCatId?'selected':''}>${esc(c.name)}</option>`).join('');
+  // 큰 목표 (선택)
+  fillBigGoalSelect('wpNewGoal','wpNewGoalLb',null);
   // 카드 연결 (1:1: 이미 다른 블록에 연결된 카드 제외)
   const linkSel=document.getElementById('wpNewLink');
   const usedCardIds=new Set(weekData.blocks.filter(b=>b.cardId).map(b=>b.cardId));
@@ -1183,6 +1185,7 @@ function openBlockEditModal(id){
   actualWrap.style.display=isDone?'block':'none';
   const sel=document.getElementById('wpBlkCat');
   sel.innerHTML=weekData.categories.map(c=>`<option value="${c.id}" ${c.id===b.categoryId?'selected':''}>${esc(c.name)}</option>`).join('');
+  fillBigGoalSelect('wpBlkGoal','wpBlkGoalLb',b.goalId||null);
   renderBlockLinkSection(b);
   document.getElementById('wpBlockMo').classList.add('open');
 }
@@ -1486,6 +1489,17 @@ function renderBigGoals(){
   });
 }
 document.getElementById('bgGoalMo').addEventListener('click',e=>{if(e.target===e.currentTarget)closeBigGoalMo();});
+
+// 블록 모달용 큰 목표 셀렉터 채우기 (큰 목표 0개면 라벨/셀렉터 숨김)
+function fillBigGoalSelect(selId,lbId,selectedId){
+  const sel=document.getElementById(selId),lb=document.getElementById(lbId);
+  if(!sel||!lb)return;
+  if(!bigGoals.length){lb.style.display='none';sel.style.display='none';sel.innerHTML='';return;}
+  lb.style.display='';sel.style.display='';
+  let html='<option value="">— 없음 —</option>';
+  html+=bigGoals.map(g=>`<option value="${g.id}" ${g.id===selectedId?'selected':''}>${esc(g.title.length>30?g.title.slice(0,30)+'…':g.title)}</option>`).join('');
+  sel.innerHTML=html;
+}
 
 /* ══════════════════════════════════════════════
    [P1] localStorage UID-SCOPED HELPERS
