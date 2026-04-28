@@ -296,13 +296,18 @@ body.view-week.mode-popup .p-week{display:flex;}
 .bg-goals{margin-top:10px;padding:10px 12px;background:var(--grp);border-radius:10px;border:1px solid var(--sep);}
 .bg-goals-title{font-size:11px;font-weight:700;color:var(--sec);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px;display:flex;align-items:center;gap:6px;}
 .bg-goals-empty{font-size:12px;color:var(--sec);line-height:1.5;margin-bottom:8px;}
-.bg-goal-item{display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--surface);border-radius:8px;margin-bottom:4px;font-size:13px;}
+.bg-goal-item{display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--surface);border-radius:8px;margin-bottom:4px;font-size:13px;cursor:pointer;transition:background .15s;-webkit-user-select:none;user-select:none;}
 .bg-goal-item:last-of-type{margin-bottom:8px;}
+.bg-goal-item:hover{background:#F0F6FF;}
+.bg-goal-item.done{opacity:.5;}
+.bg-goal-item.done .bg-goal-title{text-decoration:line-through;color:var(--sec);}
+.bg-goal-item.toggling{animation:bgGoalToggle .25s ease;}
+@keyframes bgGoalToggle{0%{transform:scale(1)}40%{transform:scale(1.04)}100%{transform:scale(1)}}
 .bg-goal-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
 .bg-goal-title{flex:1;color:var(--label);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.bg-goal-act{background:none;border:none;color:var(--sec);font-size:13px;cursor:pointer;padding:2px 4px;border-radius:4px;line-height:1;}
-.bg-goal-act:hover{color:var(--label);background:var(--grp);}
-.bg-goal-act.del:hover{color:var(--red);background:#FF3B3015;}
+.bg-goal-swatch{width:22px;height:22px;border-radius:50%;border:2px solid transparent;cursor:pointer;padding:0;flex-shrink:0;transition:transform .1s;}
+.bg-goal-swatch:hover{transform:scale(1.1);}
+.bg-goal-swatch.active{border-color:var(--label);}
 .bg-goal-add{background:none;border:1px dashed var(--sep);border-radius:8px;padding:6px 12px;font-size:12px;color:var(--blue);cursor:pointer;font-family:inherit;font-weight:600;transition:all .15s;}
 .bg-goal-add:hover{border-color:var(--blue);background:#F0F6FF;}
 .wp-stat{display:inline-flex;align-items:center;gap:5px;margin-right:14px;}
@@ -576,9 +581,17 @@ body.view-week.mode-popup .p-week{display:flex;}
   <div class="mo-t">🎯 큰 목표</div>
   <div class="mo-d" style="margin-bottom:12px">분기/연 단위 큰 목표 (예: WorldQuant IQC 통과)</div>
   <input class="mo-in" id="bgGoalTitle" placeholder="큰 목표 제목" style="font-family:inherit">
-  <div class="mo-acts">
-    <button class="mo-btn sec" onclick="closeBigGoalMo()">취소</button>
-    <button class="mo-btn pri" onclick="confirmBigGoal()">저장</button>
+  <div id="bgGoalColorRow" style="display:flex;align-items:center;gap:10px;margin-top:12px">
+    <label class="mo-lb" style="margin:0;flex-shrink:0">색상</label>
+    <input type="color" id="bgGoalColor" style="width:42px;height:34px;border:none;border-radius:8px;cursor:pointer;background:var(--grp);padding:2px;flex-shrink:0">
+    <div id="bgGoalSwatches" style="display:flex;gap:6px;flex:1;flex-wrap:wrap"></div>
+  </div>
+  <div class="mo-acts" style="justify-content:space-between">
+    <button class="mo-btn dan" id="bgGoalDelBtn" onclick="deleteBigGoalFromModal()" style="font-size:12px;padding:6px 10px">삭제</button>
+    <div style="display:flex;gap:8px">
+      <button class="mo-btn sec" onclick="closeBigGoalMo()">취소</button>
+      <button class="mo-btn pri" onclick="confirmBigGoal()">저장</button>
+    </div>
   </div>
 </div></div>
 
@@ -1385,22 +1398,28 @@ async function loadBigGoalsListen(){
 }
 function saveBigGoalsPreview(){if(PREVIEW_BYPASS)localStorage.setItem('preview_big_goals',JSON.stringify(bigGoals));}
 
-async function createBigGoal(title){
+async function createBigGoal(title,color){
   const id=PREVIEW_BYPASS?newBigGoalId():db.collection('users').doc(CU.uid).collection('goals').doc().id;
   const now=new Date().toISOString();
-  const data={id,title,color:pickGoalColor(bigGoals),createdAt:now,updatedAt:now,order:bigGoals.length};
+  const data={id,title,color:color||pickGoalColor(bigGoals),done:false,createdAt:now,updatedAt:now,order:bigGoals.length};
   if(PREVIEW_BYPASS){bigGoals.push(data);saveBigGoalsPreview();renderBigGoals();return;}
   try{await db.collection('users').doc(CU.uid).collection('goals').doc(id).set(data);}
   catch(e){console.error('[createBigGoal]',e);showToast('저장 실패 — Firestore 규칙 확인');}
 }
-async function updateBigGoalTitle(id,title){
-  const now=new Date().toISOString();
-  if(PREVIEW_BYPASS){
-    const g=bigGoals.find(x=>x.id===id);if(!g)return;
-    g.title=title;g.updatedAt=now;saveBigGoalsPreview();renderBigGoals();return;
-  }
-  try{await db.collection('users').doc(CU.uid).collection('goals').doc(id).update({title,updatedAt:now});}
+async function updateBigGoal(id,fields){
+  // fields: {title?, color?, done?}
+  const g=bigGoals.find(x=>x.id===id);if(!g)return;
+  const patch={...fields,updatedAt:new Date().toISOString()};
+  if(PREVIEW_BYPASS){Object.assign(g,patch);saveBigGoalsPreview();renderBigGoals();if(curWeekStart)renderWeekView();return;}
+  try{await db.collection('users').doc(CU.uid).collection('goals').doc(id).update(patch);}
   catch(e){console.error('[updateBigGoal]',e);showToast('수정 실패');}
+}
+async function toggleBigGoalDone(id){
+  const g=bigGoals.find(x=>x.id===id);if(!g)return;
+  await updateBigGoal(id,{done:!g.done});
+  // 토글 애니메이션 (DOM이 곧 새로 그려지지만 잠깐 효과)
+  const el=document.querySelector(`.bg-goal-item[data-bg-id="${id}"]`);
+  if(el){el.classList.add('toggling');setTimeout(()=>el.classList.remove('toggling'),250);}
 }
 async function deleteBigGoalConfirm(id){
   const g=bigGoals.find(x=>x.id===id);if(!g)return;
@@ -1420,11 +1439,36 @@ async function deleteBigGoalConfirm(id){
   catch(e){console.error('[deleteBigGoal]',e);showToast('삭제 실패');}
 }
 
+function renderBigGoalSwatches(activeColor){
+  const container=document.getElementById('bgGoalSwatches');
+  if(!container)return;
+  container.innerHTML=BIG_GOAL_PALETTE.map(c=>`<button type="button" class="bg-goal-swatch${c===activeColor?' active':''}" style="background:${c}" onclick="selectBigGoalSwatch('${c}')"></button>`).join('');
+}
+function selectBigGoalSwatch(color){
+  document.getElementById('bgGoalColor').value=color;
+  renderBigGoalSwatches(color);
+}
 function openBigGoalMo(id){
   _editingBigGoalId=id||null;
   const titleIn=document.getElementById('bgGoalTitle');
-  if(id){const g=bigGoals.find(x=>x.id===id);titleIn.value=g?g.title:'';}
-  else titleIn.value='';
+  const colorIn=document.getElementById('bgGoalColor');
+  const colorRow=document.getElementById('bgGoalColorRow');
+  const delBtn=document.getElementById('bgGoalDelBtn');
+  let isSystem=false,curColor=BIG_GOAL_PALETTE[0];
+  if(id){
+    const g=bigGoals.find(x=>x.id===id);
+    titleIn.value=g?g.title:'';
+    isSystem=!!(g&&g.isSystem);
+    curColor=g&&g.color?g.color:curColor;
+  }else{
+    titleIn.value='';
+    curColor=pickGoalColor(bigGoals);
+  }
+  colorIn.value=curColor;
+  // 시스템(일상)은 색상 픽커/삭제 숨김
+  colorRow.style.display=isSystem?'none':'flex';
+  delBtn.style.display=(id&&!isSystem)?'inline-block':'none';
+  renderBigGoalSwatches(curColor);
   document.getElementById('bgGoalMo').classList.add('open');
   setTimeout(()=>titleIn.focus(),120);
 }
@@ -1432,9 +1476,35 @@ function closeBigGoalMo(){document.getElementById('bgGoalMo').classList.remove('
 async function confirmBigGoal(){
   const title=document.getElementById('bgGoalTitle').value.trim();
   if(!title){showToast('제목을 입력하세요');return;}
-  if(_editingBigGoalId){await updateBigGoalTitle(_editingBigGoalId,title);}
-  else{await createBigGoal(title);}
+  const color=document.getElementById('bgGoalColor').value;
+  if(_editingBigGoalId){
+    const g=bigGoals.find(x=>x.id===_editingBigGoalId);
+    const patch={title};
+    // 일상은 색상 변경 차단 (UI에서 숨겼지만 코드 레벨 보호)
+    if(g&&!g.isSystem)patch.color=color;
+    await updateBigGoal(_editingBigGoalId,patch);
+  }else{
+    await createBigGoal(title,color);
+  }
   closeBigGoalMo();
+}
+async function deleteBigGoalFromModal(){
+  if(!_editingBigGoalId)return;
+  const id=_editingBigGoalId;
+  closeBigGoalMo();
+  await deleteBigGoalConfirm(id);
+}
+
+// 큰 목표 행 클릭/더블클릭 핸들러 (블록과 동일한 250ms 지연 패턴)
+let _bgClickTimer=null;
+function onBigGoalClick(id){
+  if(_bgClickTimer)clearTimeout(_bgClickTimer);
+  _bgClickTimer=setTimeout(()=>{_bgClickTimer=null;openBigGoalMo(id);},250);
+}
+function onBigGoalDblClick(id,ev){
+  if(ev){ev.stopPropagation();ev.preventDefault();}
+  if(_bgClickTimer){clearTimeout(_bgClickTimer);_bgClickTimer=null;}
+  toggleBigGoalDone(id);
 }
 async function startNewBigGoalFlow(){
   const userCount=getUserGoals().length;
@@ -1455,11 +1525,7 @@ function renderBigGoals(){
       return;
     }
     let h=`<div class="bg-goals-title">🎯 이번 분기 큰 목표</div>`;
-    h+=ordered.map(g=>{
-      const editBtn=`<button class="bg-goal-act" onclick="openBigGoalMo('${g.id}')" title="수정">✏️</button>`;
-      const delBtn=g.isSystem?'':`<button class="bg-goal-act del" onclick="deleteBigGoalConfirm('${g.id}')" title="삭제">🗑️</button>`;
-      return`<div class="bg-goal-item"><span class="bg-goal-dot" style="background:${g.color}"></span><span class="bg-goal-title">${esc(g.title)}</span>${editBtn}${delBtn}</div>`;
-    }).join('');
+    h+=ordered.map(g=>`<div class="bg-goal-item${g.done?' done':''}" data-bg-id="${g.id}" onclick="onBigGoalClick('${g.id}')" ondblclick="onBigGoalDblClick('${g.id}',event)" title="클릭: 수정 / 더블클릭: 완료 토글"><span class="bg-goal-dot" style="background:${g.color}"></span><span class="bg-goal-title">${esc(g.title)}</span></div>`).join('');
     h+=`<button class="bg-goal-add" onclick="startNewBigGoalFlow()">+ 큰 목표 추가</button>`;
     mount.innerHTML=h;
   });
