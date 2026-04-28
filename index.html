@@ -275,7 +275,7 @@ body.mode-dash .toast{bottom:28px;}
 .d-vt-tab{padding:10px 18px;font-size:13px;font-weight:600;color:var(--sec);border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;font-family:inherit;transition:all .2s;}
 .d-vt-tab:hover{color:var(--label);}
 .d-vt-tab.active{color:var(--blue);border-bottom-color:var(--blue);}
-.d-week{flex:1;overflow:hidden;display:none;flex-direction:column;align-items:center;justify-content:center;color:var(--sec);font-size:14px;background:var(--bg);}
+.d-week{flex:1;overflow:hidden;display:none;flex-direction:column;background:var(--bg);}
 body.view-week.mode-dash .d-board{display:none;}
 body.view-week.mode-dash .d-week{display:flex;}
 body.view-week.mode-dash .d-fab{display:none;}
@@ -288,7 +288,8 @@ body.view-week.mode-popup .p-tabs,body.view-week.mode-popup .p-feed,body.view-we
 body.view-week.mode-popup .p-week{display:flex;}
 
 /* ══════ WEEKLY PLANNER ══════ */
-.wp-wrap{flex:1;display:flex;flex-direction:column;background:var(--bg);overflow:hidden;}
+.wp-wrap{flex:1;display:flex;flex-direction:column;background:var(--bg);overflow:hidden;width:100%;}
+@media (min-width:768px){body.mode-dash .wp-wrap{max-width:1400px;min-width:800px;margin:0 auto;}}
 .wp-top{flex-shrink:0;padding:12px 20px 10px;background:var(--surface);border-bottom:1px solid var(--sep);}
 .wp-nav{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
 .wp-nav-btn{background:var(--grp);border:none;border-radius:8px;padding:6px 12px;font-family:inherit;font-size:13px;font-weight:600;color:var(--label);cursor:pointer;transition:background .15s;}
