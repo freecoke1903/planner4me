@@ -1,4 +1,4 @@
-const CACHE_NAME = 'braindump-v15';
+const CACHE_NAME = 'braindump-v16';
 const PRECACHE_URLS = [
   './',
   './index.html',

@@ -733,7 +733,6 @@ function renderBlocksHTML(){
     const endRow=Math.ceil(b.endMin/30);
     const span=Math.max(1,endRow-startRow);
     const linkBadge=b.cardId?'<span class="wp-block-link">🔗</span>':'';
-    const goalBadge=linkedGoal?`<span class="wp-block-link" style="color:${linkedGoal.color}">🎯</span>`:'';
     const lo=layout[b.id]||{lane:0,totalLanes:1};
     let layoutStyle='';
     if(lo.totalLanes>1){
@@ -762,7 +761,7 @@ function renderBlocksHTML(){
     const cls=['wp-block'];
     if(isSpontaneous)cls.push('spontaneous');
     if(isDone)cls.push('done');
-    return`<div class="${cls.join(' ')}" data-block-id="${b.id}" data-card-id="${b.cardId||''}" draggable="true" style="background:${blockBg};grid-column:${b.day+2};grid-row:${startRow+2} / span ${span};${layoutStyle}" onclick="onBlockClick('${b.id}')" ondblclick="onBlockDblClick('${b.id}',event)">${inkHTML}<div class="wp-block-title">${esc(b.title)}${linkBadge}${goalBadge}</div><div class="wp-block-time">${fmtMin(b.startMin)}-${fmtMin(b.endMin)}</div></div>`;
+    return`<div class="${cls.join(' ')}" data-block-id="${b.id}" data-card-id="${b.cardId||''}" draggable="true" style="background:${blockBg};grid-column:${b.day+2};grid-row:${startRow+2} / span ${span};${layoutStyle}" onclick="onBlockClick('${b.id}')" ondblclick="onBlockDblClick('${b.id}',event)">${inkHTML}<div class="wp-block-title">${esc(b.title)}${linkBadge}</div><div class="wp-block-time">${fmtMin(b.startMin)}-${fmtMin(b.endMin)}</div></div>`;
   }).join('');
 }
 
@@ -1257,13 +1256,27 @@ async function deleteCurBlock(){
   closeBlockMo();renderWeekView();
 }
 
-/* ═══ Time Stats ═══ */
+/* ═══ Time Stats — 큰 목표별 ═══ */
 function fmtHrMin(min){const h=Math.floor(min/60),m=min%60;if(h===0&&m===0)return'0분';if(h===0)return m+'분';if(m===0)return h+'시간';return h+'시간 '+m+'분';}
 function renderCatStatsHTML(){
-  // Step 4에서 큰 목표 기준 합계로 재작성 예정. 일단 단순 합계만.
-  const total=weekData.blocks.reduce((s,b)=>s+Math.max(0,b.endMin-b.startMin),0);
+  // 블록 시간 합산 (planned 기준; 회고 모달은 actual 기준이지만 푸터는 계획 합계가 자연스러움)
+  const minutesByGoal={};
+  let total=0;
+  weekData.blocks.forEach(b=>{
+    const min=Math.max(0,b.endMin-b.startMin);
+    if(!min)return;
+    const key=b.goalId||'__unknown__';
+    minutesByGoal[key]=(minutesByGoal[key]||0)+min;
+    total+=min;
+  });
   if(!total)return'⏱️ <span style="color:var(--sec)">아직 블록이 없어요. 빈 셀을 클릭해 보세요.</span>';
-  return`⏱️ 합계 <strong>${fmtHrMin(total)}</strong>`;
+  // 사용자 정의 큰 목표 (시간 큰 순) → 일상 마지막
+  const userGoals=getUserGoals().filter(g=>(minutesByGoal[g.id]||0)>0).sort((a,b)=>(minutesByGoal[b.id]||0)-(minutesByGoal[a.id]||0));
+  const daily=getDailyGoal();
+  const ordered=[...userGoals];
+  if(daily&&(minutesByGoal[daily.id]||0)>0)ordered.push(daily);
+  const inner=ordered.map(g=>`<span class="wp-stat"><span class="wp-stat-dot" style="background:${g.color}"></span><span class="wp-stat-name">${esc(g.title)}</span> ${fmtHrMin(minutesByGoal[g.id]||0)}</span>`).join('');
+  return`⏱️ 합계 <strong>${fmtHrMin(total)}</strong> · ${inner}`;
 }
 
 function scrollToCurrentTime(){
@@ -1740,16 +1753,15 @@ async function renderBigGoalsInWeekly(){
     };
     snap.blocks.forEach(migrateBlock);
   }
-  // done 블록만 + actual 시간 합산
-  const minutesByGoal={}; // goalId(또는 'none') → 분
+  // done 블록만 + actual 시간 합산 (모든 블록은 goalId 보장됨)
+  const minutesByGoal={};
   let totalMin=0;
   (snap.blocks||[]).forEach(b=>{
     if(b.status!=='done')return;
     if(b.actualStart==null||b.actualEnd==null)return;
     const min=Math.max(0,b.actualEnd-b.actualStart);
-    if(min<=0)return;
-    const key=b.goalId||'__none__';
-    minutesByGoal[key]=(minutesByGoal[key]||0)+min;
+    if(min<=0||!b.goalId)return;
+    minutesByGoal[b.goalId]=(minutesByGoal[b.goalId]||0)+min;
     totalMin+=min;
   });
   sec.style.display='';
@@ -1757,15 +1769,11 @@ async function renderBigGoalsInWeekly(){
     list.innerHTML='<div class="rv-bg-empty">완료된 시간 블록이 아직 없어요.<br>블록을 더블클릭해서 ✓ 완료 처리해 보세요.</div>';
     return;
   }
-  // 행 구성: 시간 큰 순, 마지막에 일상
-  const rows=[];
-  bigGoals.forEach(g=>{
-    const min=minutesByGoal[g.id]||0;
-    if(min>0)rows.push({title:g.title,color:g.color,min});
-  });
-  rows.sort((a,b)=>b.min-a.min);
-  const dailyMin=minutesByGoal['__none__']||0;
-  if(dailyMin>0)rows.push({title:'일상',color:'#8E8E93',min:dailyMin});
+  // 행 구성: 사용자 정의 큰 목표 (시간 큰 순) → 일상 (항상 마지막, 시간 무관)
+  const userGoals=getUserGoals().filter(g=>(minutesByGoal[g.id]||0)>0).sort((a,b)=>(minutesByGoal[b.id]||0)-(minutesByGoal[a.id]||0));
+  const daily=getDailyGoal();
+  const rows=userGoals.map(g=>({title:g.title,color:g.color,min:minutesByGoal[g.id]}));
+  if(daily&&(minutesByGoal[daily.id]||0)>0)rows.push({title:daily.title,color:daily.color,min:minutesByGoal[daily.id]});
   list.innerHTML=rows.map(r=>{
     const pct=Math.round(r.min/totalMin*100);
     return`<div class="rv-bg-row"><span class="rv-bg-dot" style="background:${r.color}"></span><span class="rv-bg-title">${esc(r.title)}</span><span class="rv-bg-time">${fmtHrMin(r.min)} (${pct}%)</span></div>`;
