@@ -244,6 +244,12 @@ body.mode-dash .view-popup{display:none!important;}
 .rv-memo-ta{width:100%;padding:12px 14px;border:1px solid var(--sep);border-radius:12px;font-family:inherit;font-size:13.5px;line-height:1.6;color:var(--label);outline:none;background:var(--grp);resize:vertical;min-height:80px;max-height:240px;transition:border-color .2s;}
 .rv-memo-ta:focus{border-color:var(--blue);background:var(--surface);}
 .rv-memo-ta:disabled{cursor:not-allowed;opacity:.7;}
+.rv-memo-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-top:8px;}
+.rv-memo-status{font-size:11px;color:var(--sec);font-weight:500;transition:opacity .2s;}
+.rv-memo-status.show{color:var(--green);}
+.rv-memo-save{padding:7px 18px;border:1px solid var(--blue);border-radius:10px;background:var(--blue);color:#fff;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;}
+.rv-memo-save:hover{filter:brightness(1.05);}
+.rv-memo-save:disabled{opacity:.5;cursor:not-allowed;}
 .rv-hdr{margin:-4px -2px 14px;padding-bottom:12px;border-bottom:1px solid var(--sep);display:flex;align-items:flex-start;justify-content:space-between;gap:12px;}
 .rv-hdr-left{flex:1;min-width:0;}
 .rv-hdr-title{font-size:20px;font-weight:700;color:var(--label);margin-bottom:4px;}
@@ -525,7 +531,14 @@ body.view-week.mode-popup .p-week{display:flex;}
   <div class="ctx-section" id="rvSecCompare"><div class="ctx-sec-title">🔄 비교 — 시간 흐름</div><div class="ctx-brain" id="rvCompare"><div class="rv-placeholder">분석 활성화 후 표시됩니다</div></div></div>
   <div class="ctx-section" id="rvSecConnect"><div class="ctx-sec-title">🔗 연결 — 데이터 간 관계</div><div class="ctx-brain" id="rvConnect"><div class="rv-placeholder">분석 활성화 후 표시됩니다</div></div></div>
   <div class="ctx-section" id="rvSecRecord"><div class="ctx-sec-title">📝 기록 — 메타 정보</div><div class="ctx-brain" id="rvRecord"><div class="rv-placeholder">분석 활성화 후 표시됩니다</div></div></div>
-  <div class="ctx-section" id="rvSecMemo"><div class="ctx-sec-title">✏️ 회고 메모</div><textarea class="rv-memo-ta" id="rvMemoInput" placeholder="이번 주 본인의 한 줄 회고를 적어보세요. (저장은 다음 단계에서 활성화 예정)" disabled></textarea></div>
+  <div class="ctx-section" id="rvSecMemo">
+    <div class="ctx-sec-title">✏️ 회고 메모</div>
+    <textarea class="rv-memo-ta" id="rvMemoInput" placeholder="이번 주 본인의 한 줄 회고를 적어보세요"></textarea>
+    <div class="rv-memo-actions">
+      <span class="rv-memo-status" id="rvMemoStatus"></span>
+      <button class="rv-memo-save" onclick="saveWeeklyUserMemo()">저장</button>
+    </div>
+  </div>
   <div class="ctx-section" id="rvSecTime" style="display:none"><div class="ctx-sec-title">⏱️ 이번 주의 몰입 기록</div><div id="rvTimeList"></div></div>
   <div class="ctx-section" id="rvSecB" style="display:none"><div class="ctx-sec-title">💡 메모 수확</div><div class="rv-memo-preview" id="rvMemoPreview"></div><button class="rv-share-btn" onclick="shareWeeklyMemos()">📤 외부 앱으로 공유하기</button></div>
   <div class="ctx-section" id="rvSecC"><div class="ctx-sec-title">📦 시스템 리셋</div><p style="font-size:13px;color:var(--sec);line-height:1.5;margin-bottom:10px">남은 항목들을 보관함으로 보내고 뇌를 비우세요.</p><button class="rv-archive-btn" onclick="archiveLeftovers()">📦 미완료 &amp; 메모 모두 보관함으로</button></div>
@@ -2016,13 +2029,17 @@ async function computeWeeklyArchive(monday){
 async function saveWeeklyArchive(monday){
   const data=await computeWeeklyArchive(monday);
   const wid=getISOWeekId(monday);
+  // 기존 userMemo / aiSummary 같은 사용자 입력 필드는 보존
   if(PREVIEW_BYPASS){
-    localStorage.setItem('preview_archive_'+wid,JSON.stringify(data));
-    return{wid,data};
+    let existing={};
+    try{const raw=localStorage.getItem('preview_archive_'+wid);if(raw)existing=JSON.parse(raw);}catch{}
+    const merged={...existing,...data};
+    localStorage.setItem('preview_archive_'+wid,JSON.stringify(merged));
+    return{wid,data:merged};
   }
   if(!CU)return null;
   try{
-    await db.collection('users').doc(CU.uid).collection('weeklyArchive').doc(wid).set(data);
+    await db.collection('users').doc(CU.uid).collection('weeklyArchive').doc(wid).set(data,{merge:true});
     return{wid,data};
   }catch(e){
     console.error('[saveWeeklyArchive]',e);
@@ -2059,6 +2076,37 @@ async function saveAIToArchive(weekId,partial){
     Object.entries(partial).forEach(([k,v])=>{updates[`aiSummary.${k}`]=v;});
     await db.collection('users').doc(CU.uid).collection('weeklyArchive').doc(weekId).update(updates);
   }catch(e){console.error('[saveAIToArchive]',e);}
+}
+
+// 회고 메모 — archive의 userMemo 필드 저장 (사용자 직접 입력)
+async function saveWeeklyUserMemo(){
+  const ta=document.getElementById('rvMemoInput');
+  const btn=document.querySelector('.rv-memo-save');
+  const statusEl=document.getElementById('rvMemoStatus');
+  if(!ta)return;
+  const memo=ta.value.trim();
+  const monday=monWk(new Date());
+  const wid=getISOWeekId(monday);
+  if(btn)btn.disabled=true;
+  if(statusEl){statusEl.textContent='저장 중...';statusEl.classList.remove('show');}
+  try{
+    if(PREVIEW_BYPASS){
+      let existing={};
+      try{const raw=localStorage.getItem('preview_archive_'+wid);if(raw)existing=JSON.parse(raw);}catch{}
+      existing.userMemo=memo;
+      localStorage.setItem('preview_archive_'+wid,JSON.stringify(existing));
+    }else if(CU){
+      // archive 문서가 아직 없을 수도 있으니 set merge로 안전하게
+      await db.collection('users').doc(CU.uid).collection('weeklyArchive').doc(wid).set({userMemo:memo},{merge:true});
+    }
+    if(statusEl){statusEl.textContent='✓ 저장됨';statusEl.classList.add('show');setTimeout(()=>{if(statusEl)statusEl.textContent='';statusEl.classList.remove('show');},2000);}
+  }catch(e){
+    console.error('[saveWeeklyUserMemo]',e);
+    if(statusEl)statusEl.textContent='저장 실패';
+    showToast(e.code==='permission-denied'?'권한 없음':'저장 실패');
+  }finally{
+    if(btn)btn.disabled=false;
+  }
 }
 
 /* ══════════════════════════════════════════════
@@ -2389,14 +2437,19 @@ async function checkWeekly(){try{
 }catch(e){console.error('[checkWeekly]',e);}}
 
 async function openWeeklyManual(){
-  // v16: archive 저장 + 화면 렌더 + AI 4역할
+  // v16: archive 저장 + 화면 렌더 + AI 4역할 + 회고 메모 로드
   renderWeeklyModal();
   const wLogs=await loadWeekTimeLogs();renderTimeLogsInWeekly(wLogs);
   document.getElementById('rvMo').classList.add('open');
-  // 이번 주 archive 자동 저장 (덮어쓰기)
+  // 이번 주 archive 저장 (userMemo/aiSummary는 merge로 보존)
   const monday=monWk(new Date());
   await saveWeeklyArchive(monday);
   await renderBigGoalsInWeekly(); // archive 저장 후 화살표 표시
+  // 저장된 회고 메모 로드해서 textarea 채움
+  const wid=getISOWeekId(monday);
+  const arch=await loadOneArchive(wid);
+  const ta=document.getElementById('rvMemoInput');
+  if(ta)ta.value=(arch&&typeof arch.userMemo==='string')?arch.userMemo:'';
   await runWeeklyAI(false); // AI 4역할 (캐시 우선)
 }
 
