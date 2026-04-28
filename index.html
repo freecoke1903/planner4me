@@ -305,18 +305,6 @@ body.view-week.mode-popup .p-week{display:flex;}
 .bg-goal-act.del:hover{color:var(--red);background:#FF3B3015;}
 .bg-goal-add{background:none;border:1px dashed var(--sep);border-radius:8px;padding:6px 12px;font-size:12px;color:var(--blue);cursor:pointer;font-family:inherit;font-weight:600;transition:all .15s;}
 .bg-goal-add:hover{border-color:var(--blue);background:#F0F6FF;}
-.wp-cats{flex-shrink:0;display:flex;align-items:center;gap:6px;padding:8px 20px;background:var(--surface);border-bottom:1px solid var(--sep);overflow-x:auto;-webkit-overflow-scrolling:touch;}
-.wp-cat{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:14px;font-size:12px;font-weight:600;background:var(--grp);color:var(--label);white-space:nowrap;flex-shrink:0;}
-.wp-cat-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
-.wp-cats-note{font-size:11px;color:var(--sec);margin-left:auto;flex-shrink:0;white-space:nowrap;}
-.wp-cat-add{background:none;border:1px dashed var(--sep);border-radius:14px;padding:4px 10px;font-size:12px;color:var(--blue);cursor:pointer;font-family:inherit;font-weight:600;flex-shrink:0;transition:all .15s;}
-.wp-cat-add:hover{border-color:var(--blue);background:#F0F6FF;}
-.wp-cat-row{display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--grp);border-radius:10px;margin-bottom:6px;}
-.wp-cat-row input[type=color]{width:30px;height:30px;border:none;border-radius:6px;cursor:pointer;padding:1px;background:var(--surface);flex-shrink:0;}
-.wp-cat-row input[type=text]{flex:1;padding:6px 10px;border:1px solid var(--sep);border-radius:8px;font-family:inherit;font-size:13px;color:var(--label);outline:none;background:var(--surface);}
-.wp-cat-row input[type=text]:focus{border-color:var(--blue);}
-.wp-cat-row button{background:none;border:none;font-size:14px;cursor:pointer;padding:6px;border-radius:6px;color:var(--sec);}
-.wp-cat-row button:hover{color:var(--red);background:#FF3B3010;}
 .wp-stat{display:inline-flex;align-items:center;gap:5px;margin-right:14px;}
 .wp-stat-dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex-shrink:0;}
 .wp-stat-name{font-weight:700;color:var(--label);}
@@ -380,7 +368,6 @@ body.view-week.mode-popup .p-week{display:flex;}
   .wp-top{padding:10px 12px 8px;}
   .wp-nav-btn{padding:5px 9px;font-size:12px;}
   .wp-nav-label{font-size:13px;}
-  .wp-cats{padding:6px 12px;}
   .wp-grid{grid-template-columns:42px repeat(7,minmax(58px,1fr));min-width:0;}
   .wp-day-hdr{font-size:10px;padding:5px 2px;}
   .wp-day-hdr-d{font-size:12px;}
@@ -527,8 +514,8 @@ body.view-week.mode-popup .p-week{display:flex;}
   <div class="tmr-duration" id="tmrEndDuration">00:00</div>
   <div class="mo-d" style="margin-bottom:10px">무엇을 하셨나요?</div>
   <input class="tmr-end-input" id="tmrEndName" type="text" placeholder="프로젝트명 (예: 기획안 작성)">
-  <label class="mo-lb" style="text-align:left;margin-top:6px">📅 주간 플래너에 기록</label>
-  <select class="mo-in" id="tmrEndCat" style="font-family:inherit;margin-bottom:6px"></select>
+  <label class="mo-lb" style="text-align:left;margin-top:6px">📅 주간 플래너에 기록 (큰 목표)</label>
+  <select class="mo-in" id="tmrEndGoal" style="font-family:inherit;margin-bottom:6px"></select>
   <div class="mo-acts" style="justify-content:center;gap:12px">
     <button class="mo-btn sec" onclick="discardTimerLog()">버리기</button>
     <button class="mo-btn pri" onclick="saveTimerLog()">저장</button>
@@ -543,11 +530,9 @@ body.view-week.mode-popup .p-week{display:flex;}
     <div style="flex:1"><label class="mo-lb">시작</label><input class="mo-in" id="wpNewStart" type="time" style="font-family:inherit"></div>
     <div style="flex:1"><label class="mo-lb">끝</label><input class="mo-in" id="wpNewEnd" type="time" style="font-family:inherit"></div>
   </div>
-  <label class="mo-lb" style="margin-top:10px">카테고리</label>
-  <select class="mo-in" id="wpNewCat" style="font-family:inherit"></select>
   <label class="mo-lb" style="margin-top:10px">기존 카드 연결 (선택)</label>
   <select class="mo-in" id="wpNewLink" style="font-family:inherit"></select>
-  <label class="mo-lb" id="wpNewGoalLb" style="margin-top:10px">큰 목표 (선택)</label>
+  <label class="mo-lb" id="wpNewGoalLb" style="margin-top:10px">큰 목표</label>
   <select class="mo-in" id="wpNewGoal" style="font-family:inherit"></select>
   <div class="mo-acts">
     <button class="mo-btn sec" onclick="closeNewBlockMo()">취소</button>
@@ -576,9 +561,7 @@ body.view-week.mode-popup .p-week{display:flex;}
     </div>
     <div style="font-size:11px;color:var(--sec);margin-top:6px;line-height:1.4">계획보다 짧으면 양쪽에 옅은 영역(ghost)이 생겨요.</div>
   </div>
-  <label class="mo-lb" style="margin-top:10px">카테고리</label>
-  <select class="mo-in" id="wpBlkCat" style="font-family:inherit"></select>
-  <label class="mo-lb" id="wpBlkGoalLb" style="margin-top:10px">큰 목표 (선택)</label>
+  <label class="mo-lb" id="wpBlkGoalLb" style="margin-top:10px">큰 목표</label>
   <select class="mo-in" id="wpBlkGoal" style="font-family:inherit"></select>
   <div id="wpBlkLink"></div>
   <div class="mo-acts">
@@ -596,23 +579,6 @@ body.view-week.mode-popup .p-week{display:flex;}
   <div class="mo-acts">
     <button class="mo-btn sec" onclick="closeBigGoalMo()">취소</button>
     <button class="mo-btn pri" onclick="confirmBigGoal()">저장</button>
-  </div>
-</div></div>
-
-<!-- Weekly Planner: Category Manager -->
-<div class="mo" id="wpCatMo"><div class="mo-box" style="max-width:380px">
-  <div class="mo-t">📂 카테고리 관리</div>
-  <div class="mo-d">이름과 색상을 자유롭게 바꿀 수 있어요.</div>
-  <div id="wpCatList" style="margin-bottom:12px"></div>
-  <div class="set-div"></div>
-  <label class="mo-lb">새 카테고리 추가</label>
-  <div style="display:flex;gap:8px;align-items:center">
-    <input class="mo-in" id="wpCatNewName" placeholder="이름 (예: 운동)" style="flex:1;font-family:inherit">
-    <input type="color" id="wpCatNewColor" value="#FF9500" style="width:42px;height:38px;border:none;border-radius:8px;cursor:pointer;background:var(--grp);padding:2px">
-    <button class="mo-btn pri" onclick="addCategory()" style="padding:8px 14px">추가</button>
-  </div>
-  <div class="mo-acts">
-    <button class="mo-btn sec" onclick="closeCatMo()" style="width:100%;text-align:center">닫기</button>
   </div>
 </div></div>
 
@@ -639,14 +605,8 @@ function switchView(v){
 /* ══════════════════════════════════════════════
    WEEKLY PLANNER
    ══════════════════════════════════════════════ */
-const DEFAULT_CATEGORIES=[
-  {id:'cat-edit',name:'편집',color:'#FF9500'},
-  {id:'cat-write',name:'집필',color:'#5856D6'},
-  {id:'cat-invest',name:'투자',color:'#34C759'},
-  {id:'cat-personal',name:'개인',color:'#AF52DE'}
-];
 let curWeekStart=null;
-let weekData={categories:DEFAULT_CATEGORIES.slice(),blocks:[]};
+let weekData={blocks:[]};
 
 function getWeekContainer(){return document.getElementById(IS_POPUP?'pWeek':'dWeek');}
 function getWeekId(d){const m=monWk(d);return`${m.getFullYear()}-${String(m.getMonth()+1).padStart(2,'0')}-${String(m.getDate()).padStart(2,'0')}`;}
@@ -697,7 +657,6 @@ async function loadAndRenderWeek(){
   const wid=getWeekId(curWeekStart);
   const loaded=await loadWeekData(wid);
   weekData={
-    categories:(loaded&&loaded.categories&&loaded.categories.length)?loaded.categories:DEFAULT_CATEGORIES.slice(),
     blocks:(loaded&&loaded.blocks)||[]
   };
   weekData.blocks.forEach(migrateBlock); // 기존 데이터 자동 마이그레이션
@@ -765,15 +724,15 @@ function computeBlockLayout(blocks){
 }
 
 function renderBlocksHTML(){
-  const cats=weekData.categories;
   const layout=computeBlockLayout(weekData.blocks);
   return weekData.blocks.map(b=>{
-    const cat=cats.find(c=>c.id===b.categoryId)||cats[0];
+    // 블록 색상 = 연결된 큰 목표 색. 없거나 stale이면 일상 색으로 폴백.
+    const linkedGoal=b.goalId?bigGoals.find(g=>g.id===b.goalId):null;
+    const blockColor=linkedGoal?linkedGoal.color:DAILY_GOAL_COLOR;
     const startRow=Math.floor(b.startMin/30);
     const endRow=Math.ceil(b.endMin/30);
     const span=Math.max(1,endRow-startRow);
     const linkBadge=b.cardId?'<span class="wp-block-link">🔗</span>':'';
-    const linkedGoal=b.goalId?bigGoals.find(g=>g.id===b.goalId):null;
     const goalBadge=linkedGoal?`<span class="wp-block-link" style="color:${linkedGoal.color}">🎯</span>`:'';
     const lo=layout[b.id]||{lane:0,totalLanes:1};
     let layoutStyle='';
@@ -784,10 +743,10 @@ function renderBlocksHTML(){
     }
     const isDone=b.status==='done';
     const isSpontaneous=b.origin==='spontaneous';
-    // ghost = 카테고리 색 + alpha 30% (hex8: #RRGGBB4D)
-    const ghostBg=cat.color+'4D';
+    // ghost = 큰 목표 색 + alpha 30% (hex8: #RRGGBB4D)
+    const ghostBg=blockColor+'4D';
     // 블록 배경: spontaneous+done은 전체 ink, 그 외는 ghost
-    const blockBg=(isDone&&isSpontaneous)?cat.color:ghostBg;
+    const blockBg=(isDone&&isSpontaneous)?blockColor:ghostBg;
     // ink 영역: planned+done일 때만 actualStart~actualEnd 위치에 진한 색
     let inkHTML='';
     if(isDone&&!isSpontaneous&&b.actualStart!=null&&b.actualEnd!=null){
@@ -797,7 +756,7 @@ function renderBlocksHTML(){
       if(inkEnd>inkStart&&blockDur>0){
         const topPct=(inkStart/blockDur*100).toFixed(2);
         const heightPct=((inkEnd-inkStart)/blockDur*100).toFixed(2);
-        inkHTML=`<div class="wp-block-ink" style="top:${topPct}%;height:${heightPct}%;background:${cat.color};"></div>`;
+        inkHTML=`<div class="wp-block-ink" style="top:${topPct}%;height:${heightPct}%;background:${blockColor};"></div>`;
       }
     }
     const cls=['wp-block'];
@@ -814,9 +773,6 @@ function renderWeekView(){
   const oldScrollLeft=oldWrap?oldWrap.scrollLeft:0;
   const todayISO=getTodayISO();
   const days=['월','화','수','목','금','토','일'];
-  const cats=weekData.categories;
-  let catsHTML=cats.map(c=>`<span class="wp-cat"><span class="wp-cat-dot" style="background:${c.color}"></span>${esc(c.name)}</span>`).join('');
-  catsHTML+='<button class="wp-cat-add" onclick="openCatMo()">+ 카테고리</button>';
   let headerHTML=`<div class="wp-corner" style="grid-column:1;grid-row:1;"></div>`;
   for(let i=0;i<7;i++){
     const d=new Date(curWeekStart);d.setDate(d.getDate()+i);
@@ -846,7 +802,6 @@ function renderWeekView(){
         </div>
         <div class="bg-goals bg-goals-mount"></div>
       </div>
-      <div class="wp-cats">${catsHTML}</div>
       <div class="wp-body">
         <div class="wp-sidebar">
           <div class="wp-sb-title">📥 Brain Dump (드래그)</div>
@@ -1076,13 +1031,8 @@ function openNewBlockMo(day,row){
   titleIn.placeholder=NEW_BLOCK_PLACEHOLDERS[Math.floor(Math.random()*NEW_BLOCK_PLACEHOLDERS.length)];
   document.getElementById('wpNewStart').value=fmtMin(row*30);
   document.getElementById('wpNewEnd').value=fmtMin(Math.min(row*30+60,1440));
-  // 카테고리 (마지막에 쓴 카테고리 자동 선택, 없으면 첫 번째)
-  const catSel=document.getElementById('wpNewCat');
-  const lastCat=uGet('last_block_cat');
-  const defaultCatId=weekData.categories.find(c=>c.id===lastCat)?lastCat:weekData.categories[0].id;
-  catSel.innerHTML=weekData.categories.map(c=>`<option value="${c.id}" ${c.id===defaultCatId?'selected':''}>${esc(c.name)}</option>`).join('');
-  // 큰 목표 (선택)
-  fillBigGoalSelect('wpNewGoal','wpNewGoalLb',null);
+  // 큰 목표 (기본값: 일상)
+  fillBigGoalSelect('wpNewGoal','wpNewGoalLb',uGet('last_block_goal'));
   // 카드 연결 (1:1: 이미 다른 블록에 연결된 카드 제외)
   const linkSel=document.getElementById('wpNewLink');
   const usedCardIds=new Set(weekData.blocks.filter(b=>b.cardId).map(b=>b.cardId));
@@ -1120,13 +1070,12 @@ async function confirmNewBlock(){
   if(!canAddBlock(day,start,end)){
     showToast('한 시간대에 최대 2개까지만 겹칠 수 있어요');return;
   }
-  const catId=document.getElementById('wpNewCat').value||weekData.categories[0].id;
   const cardId=document.getElementById('wpNewLink').value||null;
   const goalId=document.getElementById('wpNewGoal').value||(getDailyGoal()?.id||null);
-  uSet('last_block_cat',catId); // 다음 블록 추가 시 기본값으로 사용
+  if(goalId)uSet('last_block_goal',goalId); // 다음 블록 추가 시 기본값으로 사용
   weekData.blocks.push({
     id:'block-'+Date.now()+'-'+Math.floor(Math.random()*1000),
-    day,startMin:start,endMin:end,title,categoryId:catId,cardId,goalId,
+    day,startMin:start,endMin:end,title,cardId,goalId,
     origin:'planned',status:'pending',actualStart:null,actualEnd:null
   });
   await saveWeekData(getWeekId(curWeekStart),weekData);
@@ -1157,10 +1106,9 @@ async function addBlock(b){
     return;
   }
   const id='block-'+Date.now()+'-'+Math.floor(Math.random()*1000);
-  const cat=weekData.categories[0];
   weekData.blocks.push({
     id,day:b.day,startMin:b.startMin,endMin:b.endMin,
-    title:b.title,categoryId:cat.id,cardId:b.cardId||null,
+    title:b.title,cardId:b.cardId||null,
     goalId:b.goalId||(getDailyGoal()?.id||null),
     origin:b.origin||'planned',
     status:b.status||'pending',
@@ -1194,8 +1142,6 @@ function openBlockEditModal(id){
   document.getElementById('wpBlkActualStart').value=b.actualStart!=null?fmtMin(b.actualStart):fmtMin(b.startMin);
   document.getElementById('wpBlkActualEnd').value=b.actualEnd!=null?fmtMin(b.actualEnd):fmtMin(b.endMin);
   actualWrap.style.display=isDone?'block':'none';
-  const sel=document.getElementById('wpBlkCat');
-  sel.innerHTML=weekData.categories.map(c=>`<option value="${c.id}" ${c.id===b.categoryId?'selected':''}>${esc(c.name)}</option>`).join('');
   fillBigGoalSelect('wpBlkGoal','wpBlkGoalLb',b.goalId||null);
   renderBlockLinkSection(b);
   document.getElementById('wpBlockMo').classList.add('open');
@@ -1272,7 +1218,6 @@ async function saveCurBlock(){
   const end=parseTimeToMin(document.getElementById('wpBlkEnd').value);
   if(end<=start){showToast('끝 시간이 시작보다 늦어야 해요');return;}
   b.title=title;b.startMin=start;b.endMin=end;
-  b.categoryId=document.getElementById('wpBlkCat').value;
   b.goalId=document.getElementById('wpBlkGoal').value||(getDailyGoal()?.id||null);
   const wasDone=b.status==='done';
   const willBeDone=document.getElementById('wpBlkDone').checked;
@@ -1312,48 +1257,13 @@ async function deleteCurBlock(){
   closeBlockMo();renderWeekView();
 }
 
-/* ═══ Category Manager ═══ */
-function openCatMo(){renderCatList();document.getElementById('wpCatNewName').value='';document.getElementById('wpCatNewColor').value='#FF9500';document.getElementById('wpCatMo').classList.add('open');}
-function closeCatMo(){document.getElementById('wpCatMo').classList.remove('open');renderWeekView();}
-document.getElementById('wpCatMo').addEventListener('click',e=>{if(e.target===e.currentTarget)closeCatMo();});
-
-function renderCatList(){
-  const list=document.getElementById('wpCatList');
-  list.innerHTML=weekData.categories.map(c=>`<div class="wp-cat-row"><input type="color" value="${c.color}" oninput="updateCatColor('${c.id}',this.value)"><input type="text" value="${esc(c.name)}" onchange="updateCatName('${c.id}',this.value)"><button onclick="removeCategory('${c.id}')" title="삭제">🗑️</button></div>`).join('');
-}
-async function addCategory(){
-  const name=document.getElementById('wpCatNewName').value.trim();
-  const color=document.getElementById('wpCatNewColor').value;
-  if(!name){showToast('이름을 입력하세요');return;}
-  weekData.categories.push({id:'cat-'+Date.now(),name,color});
-  await saveWeekData(getWeekId(curWeekStart),weekData);
-  document.getElementById('wpCatNewName').value='';renderCatList();
-}
-async function updateCatColor(id,color){const c=weekData.categories.find(x=>x.id===id);if(c){c.color=color;await saveWeekData(getWeekId(curWeekStart),weekData);}}
-async function updateCatName(id,name){const c=weekData.categories.find(x=>x.id===id);const t=name.trim();if(c&&t){c.name=t;await saveWeekData(getWeekId(curWeekStart),weekData);}}
-async function removeCategory(id){
-  if(weekData.categories.length<=1){showToast('마지막 카테고리는 삭제할 수 없어요');return;}
-  if(!confirm('이 카테고리를 삭제할까요? 이 카테고리를 쓰는 블록은 첫 번째 카테고리로 이동돼요.'))return;
-  weekData.categories=weekData.categories.filter(c=>c.id!==id);
-  const fb=weekData.categories[0];
-  weekData.blocks.forEach(b=>{if(b.categoryId===id)b.categoryId=fb.id;});
-  await saveWeekData(getWeekId(curWeekStart),weekData);renderCatList();
-}
-
-/* ═══ Category Time Stats ═══ */
+/* ═══ Time Stats ═══ */
 function fmtHrMin(min){const h=Math.floor(min/60),m=min%60;if(h===0&&m===0)return'0분';if(h===0)return m+'분';if(m===0)return h+'시간';return h+'시간 '+m+'분';}
-function calcCatStats(){
-  const map={};
-  weekData.categories.forEach(c=>{map[c.id]={cat:c,minutes:0};});
-  weekData.blocks.forEach(b=>{if(map[b.categoryId])map[b.categoryId].minutes+=Math.max(0,b.endMin-b.startMin);});
-  return Object.values(map);
-}
 function renderCatStatsHTML(){
-  const stats=calcCatStats();
-  const total=stats.reduce((s,x)=>s+x.minutes,0);
-  if(!total)return'⏱️ <span style="color:var(--sec)">아직 블록이 없어요. 카드를 드래그하거나 빈 셀을 클릭해 보세요.</span>';
-  const inner=stats.filter(s=>s.minutes>0).map(s=>`<span class="wp-stat"><span class="wp-stat-dot" style="background:${s.cat.color}"></span><span class="wp-stat-name">${esc(s.cat.name)}</span> ${fmtHrMin(s.minutes)}</span>`).join('');
-  return`⏱️ 합계 <strong>${fmtHrMin(total)}</strong> · ${inner}`;
+  // Step 4에서 큰 목표 기준 합계로 재작성 예정. 일단 단순 합계만.
+  const total=weekData.blocks.reduce((s,b)=>s+Math.max(0,b.endMin-b.startMin),0);
+  if(!total)return'⏱️ <span style="color:var(--sec)">아직 블록이 없어요. 빈 셀을 클릭해 보세요.</span>';
+  return`⏱️ 합계 <strong>${fmtHrMin(total)}</strong>`;
 }
 
 function scrollToCurrentTime(){
@@ -1826,8 +1736,7 @@ async function renderBigGoalsInWeekly(){
   }else{
     const loaded=await loadWeekData(thisWid);
     snap={
-      categories:(loaded&&loaded.categories&&loaded.categories.length)?loaded.categories:DEFAULT_CATEGORIES.slice(),
-      blocks:(loaded&&loaded.blocks)||[]
+        blocks:(loaded&&loaded.blocks)||[]
     };
     snap.blocks.forEach(migrateBlock);
   }
@@ -1992,8 +1901,11 @@ async function showTimerEndModal(sec){
   document.getElementById('tmrEndMo').dataset.sec=sec;
   document.getElementById('tmrEndMo').dataset.endTime=Date.now();
   await ensureWeekDataLoaded(new Date());
-  const sel=document.getElementById('tmrEndCat');
-  sel.innerHTML=weekData.categories.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');
+  // 큰 목표 셀렉터 채우기 (사용자 정의 → 일상 순서, 일상이 기본 선택)
+  const sel=document.getElementById('tmrEndGoal');
+  const daily=getDailyGoal();
+  const ordered=daily?[...getUserGoals(),daily]:getUserGoals();
+  sel.innerHTML=ordered.map(g=>`<option value="${g.id}" ${g.id===daily?.id?'selected':''}>${esc(g.title)}</option>`).join('');
   document.getElementById('tmrEndMo').classList.add('open');
   setTimeout(()=>document.getElementById('tmrEndName').focus(),200);
 }
@@ -2005,7 +1917,6 @@ async function ensureWeekDataLoaded(d){
   const wid=getWeekId(curWeekStart);
   const loaded=await loadWeekData(wid);
   weekData={
-    categories:(loaded&&loaded.categories&&loaded.categories.length)?loaded.categories:DEFAULT_CATEGORIES.slice(),
     blocks:(loaded&&loaded.blocks)||[]
   };
   weekData.blocks.forEach(migrateBlock);
@@ -2016,7 +1927,7 @@ async function saveTimerLog(){
   const sec=parseInt(document.getElementById('tmrEndMo').dataset.sec)||0;
   const endTime=parseInt(document.getElementById('tmrEndMo').dataset.endTime)||Date.now();
   const name=document.getElementById('tmrEndName').value.trim()||'이름 없음';
-  const catId=document.getElementById('tmrEndCat').value;
+  const goalId=document.getElementById('tmrEndGoal').value||(getDailyGoal()?.id||null);
   if(sec<1){closeTmrEnd();return;}
 
   // 1) 기존 timeLogs 저장 (실제 모드일 때만)
@@ -2042,13 +1953,11 @@ async function saveTimerLog(){
     const monday=monWk(endDate);
     const wid=getWeekId(monday);
     const isCurrent=curWeekStart&&getWeekId(curWeekStart)===wid;
-    const target=isCurrent?weekData:(await loadWeekData(wid))||{goals:['','','','',''],categories:DEFAULT_CATEGORIES.slice(),blocks:[]};
+    const target=isCurrent?weekData:(await loadWeekData(wid))||{blocks:[]};
     target.blocks=target.blocks||[];
-    target.categories=target.categories&&target.categories.length?target.categories:DEFAULT_CATEGORIES.slice();
-    const useCatId=target.categories.find(c=>c.id===catId)?catId:target.categories[0].id;
     target.blocks.push({
       id:'block-'+Date.now()+'-'+Math.floor(Math.random()*1000),
-      day,startMin,endMin,title:'⏱️ '+name,categoryId:useCatId,cardId:null,
+      day,startMin,endMin,title:'⏱️ '+name,goalId,cardId:null,
       origin:'spontaneous',status:'done',
       actualStart:startMin,actualEnd:endMin
     });
