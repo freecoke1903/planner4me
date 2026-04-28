@@ -244,9 +244,13 @@ body.mode-dash .view-popup{display:none!important;}
 .rv-memo-ta{width:100%;padding:12px 14px;border:1px solid var(--sep);border-radius:12px;font-family:inherit;font-size:13.5px;line-height:1.6;color:var(--label);outline:none;background:var(--grp);resize:vertical;min-height:80px;max-height:240px;transition:border-color .2s;}
 .rv-memo-ta:focus{border-color:var(--blue);background:var(--surface);}
 .rv-memo-ta:disabled{cursor:not-allowed;opacity:.7;}
-.rv-hdr{margin:-4px -2px 14px;padding-bottom:12px;border-bottom:1px solid var(--sep);}
+.rv-hdr{margin:-4px -2px 14px;padding-bottom:12px;border-bottom:1px solid var(--sep);display:flex;align-items:flex-start;justify-content:space-between;gap:12px;}
+.rv-hdr-left{flex:1;min-width:0;}
 .rv-hdr-title{font-size:20px;font-weight:700;color:var(--label);margin-bottom:4px;}
 .rv-hdr-week{font-size:12px;color:var(--sec);font-weight:600;letter-spacing:.2px;}
+.rv-reload-btn{background:none;border:1px solid var(--sep);border-radius:8px;font-size:14px;cursor:pointer;padding:6px 10px;color:var(--label);flex-shrink:0;transition:all .15s;}
+.rv-reload-btn:hover{border-color:var(--blue);background:#F0F6FF;}
+.rv-note{font-size:11px;color:var(--sec);font-style:italic;margin-top:6px;}
 .rv-box .ctx-section{margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--sep);}
 .rv-box .ctx-section:last-of-type{border-bottom:none;padding-bottom:0;}
 .rv-box .ctx-sec-title{font-size:11px;font-weight:700;color:var(--sec);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;}
@@ -510,8 +514,11 @@ body.view-week.mode-popup .p-week{display:flex;}
 <!-- Weekly Review -->
 <div class="mo" id="rvMo"><div class="mo-box rv-box" style="max-width:460px">
   <div class="rv-hdr">
-    <div class="rv-hdr-title">📊 주간 회고</div>
-    <div class="rv-hdr-week" id="rvWeekLabel"></div>
+    <div class="rv-hdr-left">
+      <div class="rv-hdr-title">📊 주간 회고</div>
+      <div class="rv-hdr-week" id="rvWeekLabel"></div>
+    </div>
+    <button class="rv-reload-btn" onclick="rerunWeeklyAI()" title="AI 4섹션 재분석">🔄</button>
   </div>
   <div class="ctx-section" id="rvSecBigGoals" style="display:none"><div class="ctx-sec-title">🎯 큰 목표 시간 분배</div><div id="rvBigGoalList"></div></div>
   <div class="ctx-section" id="rvSecMirror"><div class="ctx-sec-title">🪞 거울 — 자기 인식</div><div class="ctx-brain" id="rvMirror"><div class="rv-placeholder">분석 활성화 후 표시됩니다</div></div></div>
@@ -1878,12 +1885,51 @@ function getISOWeekId(date){
 function fmtDateISO(d){return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
 
 // 한국어 + 영문 단순 토큰화 + 빈도 (LLM에 빈도 계산 시키지 않기 위함)
-const KEYWORD_STOPWORDS=new Set(['그리고','하지만','그래서','이거','저거','이것','저것','내일','오늘','어제','있는','없는','하는','한다','한번','지금','조금','정말','너무','다시','그냥','진짜','약간','계속','아직','이제','vs','and','the','for','with','from','this','that']);
+// 옵션 B: 조사 trim 휴리스틱 — 80~90% 정확도, 무거운 라이브러리 없음
+const KEYWORD_STOPWORDS=new Set([
+  // 시간/지시 관련
+  '그리고','하지만','그래서','그러나','왜냐하면','이거','저거','이것','저것',
+  '내일','오늘','어제','이번','지난','다음','이번주','지난주','오전','오후','저녁','아침',
+  // 상태/정도
+  '있는','없는','하는','한다','한번','지금','조금','정말','너무','다시','그냥','진짜','약간',
+  '계속','아직','이제','관련','같은','같이','그런','이런','저런','대해','대한','위해','통해',
+  // 영문
+  'vs','and','the','for','with','from','this','that','have','has','had','will','would',
+  'can','could','should','about','what','when','where','why','how','was','were','are','is'
+]);
+const KO_PARTICLES_3=['에서는','에서도','에서부터','으로부터'];
+const KO_PARTICLES_2=['에서','으로','에게','한테','부터','까지','라고','처럼','보다','밖에','마다','대해','위해'];
+const KO_VERB_END_2=['하다','하고','하면','한다','했다','했어','해서','해야'];
+const KO_PARTICLES_1=['이','가','은','는','을','를','에','로','과','와','도','만','의'];
+function trimKoreanParticle(token){
+  if(!/[가-힣]/.test(token))return token;
+  if(token.length>=4){for(const p of KO_PARTICLES_3)if(token.endsWith(p))return token.slice(0,-p.length);}
+  if(token.length>=3){
+    for(const p of KO_PARTICLES_2)if(token.endsWith(p))return token.slice(0,-p.length);
+    for(const e of KO_VERB_END_2)if(token.endsWith(e))return token.slice(0,-e.length);
+  }
+  if(token.length>=2){for(const p of KO_PARTICLES_1)if(token.endsWith(p))return token.slice(0,-p.length);}
+  return token;
+}
+function trimEnglishSuffix(token){
+  if(/[가-힣]/.test(token))return token;
+  if(token.length>=5&&token.endsWith('ing'))return token.slice(0,-3);
+  if(token.length>=4&&token.endsWith('ed'))return token.slice(0,-2);
+  if(token.length>=3&&token.endsWith('s')&&!token.endsWith('ss'))return token.slice(0,-1);
+  return token;
+}
 function extractTopKeywords(text,n){
   if(!text||!text.trim())return[];
-  const tokens=text.toLowerCase().replace(/[^\w가-힣\s]/g,' ').split(/\s+/).filter(t=>t.length>=2);
+  const rawTokens=text.toLowerCase().replace(/[^\w가-힣\s]/g,' ').split(/\s+/).filter(t=>t.length>=2);
   const freq={};
-  tokens.forEach(t=>{if(KEYWORD_STOPWORDS.has(t))return;freq[t]=(freq[t]||0)+1;});
+  rawTokens.forEach(raw=>{
+    if(KEYWORD_STOPWORDS.has(raw))return;
+    let t=trimKoreanParticle(raw);
+    t=trimEnglishSuffix(t);
+    if(t.length<2)return;
+    if(KEYWORD_STOPWORDS.has(t))return;
+    freq[t]=(freq[t]||0)+1;
+  });
   return Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,n||5).map(([word,count])=>({word,count}));
 }
 
@@ -1994,6 +2040,217 @@ async function loadOneArchive(weekId){
   try{const doc=await db.collection('users').doc(CU.uid).collection('weeklyArchive').doc(weekId).get();return doc.exists?doc.data():null;}
   catch{return null;}
 }
+
+// archive의 aiSummary 필드만 부분 갱신
+async function saveAIToArchive(weekId,partial){
+  if(PREVIEW_BYPASS){
+    try{
+      const raw=localStorage.getItem('preview_archive_'+weekId);
+      if(!raw)return;
+      const data=JSON.parse(raw);
+      data.aiSummary={...(data.aiSummary||{}),...partial};
+      localStorage.setItem('preview_archive_'+weekId,JSON.stringify(data));
+    }catch(e){console.error('[saveAIToArchive preview]',e);}
+    return;
+  }
+  if(!CU)return;
+  try{
+    const updates={};
+    Object.entries(partial).forEach(([k,v])=>{updates[`aiSummary.${k}`]=v;});
+    await db.collection('users').doc(CU.uid).collection('weeklyArchive').doc(weekId).update(updates);
+  }catch(e){console.error('[saveAIToArchive]',e);}
+}
+
+/* ══════════════════════════════════════════════
+   AI 4역할 — 거울 / 비교 / 연결 / 기록 (v16 Step 4)
+   ══════════════════════════════════════════════ */
+const RV_AI_COMMON_RULES=`[공통 규칙 — 절대 어기지 말 것]
+- 평가 금지: "잘", "좋", "훌륭", "수고", "대단", "최고" 절대 사용 X
+- 자책 유발 금지: "부족", "낮", "안 좋", "못 했", "아쉬", "안타까" 사용 X (단어 일부로 등장하는 자연스러운 표현 — "적절", "못해도 괜찮"은 허용)
+- 명령조 금지: "~하세요", "~해보세요", "~해야", "~필요해요" 사용 X
+- 인과 단정 금지: "X가 Y를 일으킴" → "X와 Y가 동반되는 패턴"
+- 사실 기반 관찰만: "~ 비중이 N%", "~ 패턴이 보임", "~로 추정됨"
+- 수치 구체 인용 (시간/퍼센트/횟수)
+- 마크다운 백틱, 인사말, 이모지 모두 금지
+`;
+
+async function callRvAI(sysPrompt,userInput,maxTokens){
+  if(!gk())return'<p class="rv-placeholder">OpenAI 키가 없어요. 설정에서 등록하세요.</p>';
+  try{
+    const res=await fetch('https://api.openai.com/v1/chat/completions',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':`Bearer ${gk()}`},
+      body:JSON.stringify({
+        model:'gpt-4o-mini',
+        messages:[{role:'system',content:sysPrompt},{role:'user',content:userInput}],
+        temperature:0.4,
+        max_tokens:maxTokens||250
+      })
+    });
+    if(!res.ok)throw new Error('API '+res.status);
+    const d=await res.json();
+    return d.choices?.[0]?.message?.content?.trim()||'<p class="rv-placeholder">응답 없음</p>';
+  }catch(e){console.error('[callRvAI]',e);return'<p class="rv-placeholder">분석 실패. 🔄 재분석으로 다시 시도</p>';}
+}
+
+// 시간대 분포 합산 헬퍼
+function sumHourly(hourly,start,end){
+  if(!Array.isArray(hourly))return 0;
+  let s=0;for(let i=start;i<end&&i<hourly.length;i++)s+=(hourly[i]||0);
+  return s;
+}
+
+// 1) 🪞 거울
+async function callMirrorAI(thisArch){
+  const goalLines=(thisArch.goalDistribution||[]).map(g=>`- ${g.goalTitle}: ${g.hours}h (${g.percentage}%)`).join('\n')||'(완료된 블록 없음)';
+  const h=thisArch.hourlyDistribution||[];
+  const hourlyLines=`0~6시: ${sumHourly(h,0,6).toFixed(1)}h
+6~9시: ${sumHourly(h,6,9).toFixed(1)}h
+9~12시: ${sumHourly(h,9,12).toFixed(1)}h
+12~18시: ${sumHourly(h,12,18).toFixed(1)}h
+18~22시: ${sumHourly(h,18,22).toFixed(1)}h
+22~24시: ${sumHourly(h,22,24).toFixed(1)}h`;
+  const diff=thisArch.plannedVsActualDiff||{avgMinutes:0,totalBlocks:0};
+  const diffLine=diff.totalBlocks>0?`평균 ${diff.avgMinutes>=0?'+':''}${diff.avgMinutes}분 (${diff.totalBlocks}개 done planned 블록 기준)`:'(done planned 블록 없음)';
+  const userInput=`[이번 주 큰 목표별 시간 (done actual)]
+${goalLines}
+
+[시간대 분포 (24시간 합산)]
+${hourlyLines}
+
+[계획 vs 실제 차이]
+${diffLine}`;
+  const sys=RV_AI_COMMON_RULES+`
+너는 사용자의 이번 주 데이터를 보고 본인이 무의식적으로 한 행동의 패턴을 짚는 거울이야.
+
+목표:
+- 시간대 분포 / 계획 vs 실제 차이 / 큰 목표 분배 중 1~2개 차원
+- 사용자가 평소 의식 못한 행동 경향을 짚기
+
+출력 톤 (둘 다 OK):
+- 추세: "야간 작업 패턴이 누적되는 중으로 추정"
+- 사실 보고: "야간 시간대(22~24시) 활용 비중 35%"
+
+추세 표현 ("누적되는 중", "강해지는 중", "굳어지는 중") 사용 제한:
+한 응답당 최대 1번. 반복 X.
+
+출력 형식: HTML <p> 1~2개. <strong> / <em> 강조 OK.`;
+  return callRvAI(sys,userInput,250);
+}
+
+// 2) 🔄 비교
+async function callCompareAI(thisArch,lastArchives){
+  if(!lastArchives||lastArchives.length===0){
+    return'<p class="rv-placeholder">비교 데이터 누적 중 (0/4주차)</p>';
+  }
+  const sampleN=lastArchives.length;
+  const userLines=[];
+  userLines.push(`[이번 주 (${thisArch.weekStart})]`);
+  userLines.push(`- 큰 목표별: ${(thisArch.goalDistribution||[]).map(g=>`${g.goalTitle} ${g.hours}h`).join(', ')||'(없음)'}`);
+  userLines.push(`- 야간(22~24시): ${sumHourly(thisArch.hourlyDistribution,22,24).toFixed(1)}h`);
+  userLines.push(`- 카드 생성/완료: ${thisArch.cardsCreated}/${thisArch.cardsCompleted}`);
+  userLines.push('');
+  userLines.push(`[지난 ${sampleN}주 archive — 최근→과거]`);
+  lastArchives.forEach(a=>{
+    const goals=(a.goalDistribution||[]).map(g=>`${g.goalTitle} ${g.hours}h`).join(', ')||'(없음)';
+    const night=sumHourly(a.hourlyDistribution,22,24).toFixed(1);
+    userLines.push(`${a.weekStart}: ${goals} / 야간 ${night}h / 카드 ${a.cardsCreated}/${a.cardsCompleted}`);
+  });
+  const sys=RV_AI_COMMON_RULES+`
+너는 사용자의 이번 주 데이터를 지난 주들과 비교해 변화를 짚는 분석가야.
+
+목표:
+- 큰 목표 시간 변화 / 시간대 변화 / 카드 통계 변화 중 1~3개
+- "처음 본 패턴" 사용 조건: 표본 4주 이상일 때만 사용 가능. 표본이 ${sampleN}주이므로 ${sampleN>=4?'"처음 본 패턴" 사용 가능':'"처음 본 패턴" 사용 불가, 단순 변화만 보고'}.
+- 반복 패턴은 정확한 N으로 "N주 연속" 명시
+
+출력 형식: HTML <ul><li> 1~3개 또는 <p> 1~2개.
+응답 마지막 줄에 반드시 다음 부기: <p class="rv-note">표본 ${sampleN}주 기준</p>`;
+  return callRvAI(sys,userLines.join('\n'),350);
+}
+
+// 3) 🔗 연결
+async function callConnectAI(thisArch,lastArchives){
+  if(!lastArchives||lastArchives.length===0){
+    return'<p class="rv-placeholder">패턴 분석을 위한 데이터 누적 중 (0/4주차)</p>';
+  }
+  const sampleN=lastArchives.length+1; // 이번 주 포함
+  let strengthGuide;
+  if(sampleN<=3)strengthGuide=`표본 ${sampleN}주: "이번 주에 X와 Y가 함께 관찰됨" 정도 약하게. "패턴"이라고 단정 X.`;
+  else if(sampleN<=7)strengthGuide=`표본 ${sampleN}주: "X와 Y가 동반되는 패턴" 사용 가능.`;
+  else strengthGuide=`표본 ${sampleN}주: "X와 Y는 ${sampleN}주 표본에서 일관된 패턴" 단정 가능.`;
+  const all=[thisArch,...lastArchives];
+  const tableLines=all.map(a=>{
+    const goals=(a.goalDistribution||[]).map(g=>`${g.goalTitle}${g.hours}`).join('|')||'(없음)';
+    const night=sumHourly(a.hourlyDistribution,22,24).toFixed(1);
+    const diff=a.plannedVsActualDiff?.avgMinutes||0;
+    return`${a.weekStart}: 목표 ${goals} | 야간 ${night}h | 카드 ${a.cardsCreated}/${a.cardsCompleted} | 추정오차 ${diff>=0?'+':''}${diff}분`;
+  });
+  const userInput=`[주차별 통합 데이터 — 이번 주 + 지난 ${lastArchives.length}주]
+${tableLines.join('\n')}`;
+  const sys=RV_AI_COMMON_RULES+`
+너는 여러 주의 데이터를 교차 분석해 함께 움직이는 변수를 찾는 분석가야.
+인과 단정 절대 금지: "X가 Y를 일으킴" → "X와 Y가 함께 움직이는 패턴".
+
+표본 단계별 표현 강도:
+${strengthGuide}
+
+목표:
+다음 중 1~2개의 동반 관계를 짚기:
+- 큰 목표 시간 ↔ 야간 비중
+- 큰 목표 시간 ↔ 카드 완료율
+- 큰 목표 X 시간 ↔ 큰 목표 Y 시간 (트레이드오프)
+- 시작 시간/시간대 ↔ 추정 오차
+
+출력 형식: HTML <p> 1~2개. 각 1문장.
+응답 마지막 줄에 반드시 다음 부기: <p class="rv-note">표본 ${sampleN}주 기준</p>`;
+  return callRvAI(sys,userInput,350);
+}
+
+// 4) 📝 기록
+async function callRecordAI(thisArch,weekTasks){
+  const kw=thisArch.topKeywords||[];
+  const kwLines=kw.length?kw.map(k=>`- ${k.word}: ${k.count}회`).join('\n'):'(키워드 없음)';
+  const undone=(weekTasks||[]).filter(t=>!t.done);
+  // 미완 카드 키워드
+  const undoneKw=extractTopKeywords(undone.map(t=>t.text||'').join(' '),3);
+  const undoneKwLines=undoneKw.length?undoneKw.map(k=>`- ${k.word}: ${k.count}회`).join('\n'):'(미완 카드 없음)';
+  // 평균 작성 시각
+  const times=(weekTasks||[]).map(t=>{
+    const d=new Date(t.createdAt);
+    return isNaN(d.getTime())?null:d.getHours()*60+d.getMinutes();
+  }).filter(m=>m!==null);
+  let avgTime='(데이터 없음)';
+  if(times.length){
+    const avg=Math.round(times.reduce((s,m)=>s+m,0)/times.length);
+    avgTime=`${String(Math.floor(avg/60)).padStart(2,'0')}:${String(avg%60).padStart(2,'0')}`;
+  }
+  const undoneSamples=undone.slice(0,10).map(t=>`- ${t.text||''}`).join('\n')||'(없음)';
+  const userInput=`[이번 주 카드 키워드 TOP 5 (코드 계산 결과)]
+${kwLines}
+
+[카드 통계]
+생성 ${thisArch.cardsCreated}개 / 완료 ${thisArch.cardsCompleted}개 / 미완 ${thisArch.cardsCreated-thisArch.cardsCompleted}개
+평균 작성 시각: ${avgTime}
+
+[미완 카드 키워드]
+${undoneKwLines}
+
+[미완 카드 텍스트 (최대 10개)]
+${undoneSamples}`;
+  const sys=RV_AI_COMMON_RULES+`
+너는 사용자의 이번 주 카드/메모 데이터에서 메타 정보를 정리해 보여주는 기록자야.
+
+목표:
+- 키워드 빈도, 카드 통계, 미완 카드 분포에서
+- 사용자가 명시적으로 안 적은 메타 맥락 추출
+- 키워드 빈도는 입력 데이터 그대로 사용 (자체 계산 X).
+  단, 의미적으로 같은 한글 단어가 두 개 이상 입력에 보이면 (예: "이메일", "이메일을"), 가장 빈도 높은 형태로 묶어서 표시 가능.
+
+출력 형식: HTML <ul><li> 1~3개. 키워드 빈도는 항상 첫 줄.`;
+  return callRvAI(sys,userInput,300);
+}
+
 
 async function callDailySummaryAI(texts){
   if(!Array.isArray(texts)||!texts.length)return'요약할 데이터가 없어요.';
@@ -2132,15 +2389,80 @@ async function checkWeekly(){try{
 }catch(e){console.error('[checkWeekly]',e);}}
 
 async function openWeeklyManual(){
-  // v16 Step 2: archive 저장 + 화면 렌더
+  // v16: archive 저장 + 화면 렌더 + AI 4역할
   renderWeeklyModal();
   const wLogs=await loadWeekTimeLogs();renderTimeLogsInWeekly(wLogs);
   document.getElementById('rvMo').classList.add('open');
-  // 이번 주 archive 자동 저장 (덮어쓰기) — 완료되면 화살표 갱신
+  // 이번 주 archive 자동 저장 (덮어쓰기)
   const monday=monWk(new Date());
   await saveWeeklyArchive(monday);
-  await renderBigGoalsInWeekly(); // archive 저장 후 화살표 표시 위해 재렌더
+  await renderBigGoalsInWeekly(); // archive 저장 후 화살표 표시
+  await runWeeklyAI(false); // AI 4역할 (캐시 우선)
 }
+
+// 섹션 DOM에 HTML 채움
+function setAISection(name,html){
+  const el=document.getElementById('rv'+name);
+  if(!el)return;
+  el.classList.add('rv-ai');
+  el.innerHTML=html||'<p class="rv-placeholder">분석 결과 없음</p>';
+}
+
+// 4역할 오케스트레이터 — 병렬 호출, 도착 순서대로 채움
+async function runWeeklyAI(force){
+  const monday=monWk(new Date());
+  const wid=getISOWeekId(monday);
+  const thisArch=await loadOneArchive(wid);
+  if(!thisArch){
+    ['Mirror','Compare','Connect','Record'].forEach(n=>setAISection(n,'<p class="rv-placeholder">archive 데이터 없음</p>'));
+    return;
+  }
+  const cached=force?null:(thisArch.aiSummary||null);
+  // 캐시 전체 적중 시 즉시 반영하고 종료
+  if(cached&&cached.mirror&&cached.compare&&cached.connect&&cached.record){
+    setAISection('Mirror',cached.mirror);
+    setAISection('Compare',cached.compare);
+    setAISection('Connect',cached.connect);
+    setAISection('Record',cached.record);
+    return;
+  }
+  // OpenAI 키 없으면 안내만
+  if(!gk()){
+    ['Mirror','Compare','Connect','Record'].forEach(n=>setAISection(n,'<p class="rv-placeholder">OpenAI 키가 없어요. 설정에서 등록하세요.</p>'));
+    return;
+  }
+  // 부분 캐시: 있는 것만 표시, 없는 것은 로딩 → 호출
+  const loadingHTML='<div class="ctx-brain-loading"><div class="g-sp"></div>분석 중...</div>';
+  const need={mirror:!cached?.mirror,compare:!cached?.compare,connect:!cached?.connect,record:!cached?.record};
+  setAISection('Mirror',cached?.mirror||loadingHTML);
+  setAISection('Compare',cached?.compare||loadingHTML);
+  setAISection('Connect',cached?.connect||loadingHTML);
+  setAISection('Record',cached?.record||loadingHTML);
+  // 지난 4주 archive 로드 (비교/연결용)
+  const lastArchives=[];
+  for(let i=1;i<=4;i++){
+    const d=new Date(monday);d.setDate(d.getDate()-7*i);
+    const a=await loadOneArchive(getISOWeekId(d));
+    if(a)lastArchives.push(a);
+  }
+  // 이번 주 task (record용)
+  const monIso=monday.toISOString();
+  const next=new Date(monday);next.setDate(next.getDate()+7);
+  const nextIso=next.toISOString();
+  const weekTasks=tasks.filter(t=>t.createdAt&&t.createdAt>=monIso&&t.createdAt<nextIso);
+  // 4개 병렬 호출, 도착 순서대로 채움 + 캐시 갱신
+  if(need.mirror)callMirrorAI(thisArch).then(html=>{setAISection('Mirror',html);saveAIToArchive(wid,{mirror:html});});
+  if(need.compare)callCompareAI(thisArch,lastArchives).then(html=>{setAISection('Compare',html);saveAIToArchive(wid,{compare:html});});
+  if(need.connect)callConnectAI(thisArch,lastArchives).then(html=>{setAISection('Connect',html);saveAIToArchive(wid,{connect:html});});
+  if(need.record)callRecordAI(thisArch,weekTasks).then(html=>{setAISection('Record',html);saveAIToArchive(wid,{record:html});});
+}
+
+// 재분석 버튼
+async function rerunWeeklyAI(){
+  showToast('🔄 4섹션 재분석 중...');
+  await runWeeklyAI(true);
+}
+
 
 async function shareWeeklyMemos(){const mon=monWk(new Date()).toISOString();const memos=tasks.filter(t=>t.category==='memo'&&t.createdAt>=mon);if(!memos.length){showToast('공유할 메모 없음');return;}const text='🧠 이번 주 Brain Dump 메모\n\n'+memos.map(t=>'• '+t.text).join('\n');if(navigator.share){try{await navigator.share({title:'이번 주 메모',text});}catch(e){if(e.name!=='AbortError')showToast('공유 실패');}}else{try{await navigator.clipboard.writeText(text);showToast('클립보드에 복사됨');}catch{showToast('복사 실패');}}}
 
