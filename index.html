@@ -254,6 +254,10 @@ body.mode-dash .view-popup{display:none!important;}
 .rv-bg-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
 .rv-bg-title{flex:1;color:var(--label);font-weight:500;word-break:break-word;}
 .rv-bg-time{font-size:12px;color:var(--sec);flex-shrink:0;font-weight:600;font-variant-numeric:tabular-nums;}
+.rv-bg-arrow{font-size:11px;font-weight:700;flex-shrink:0;padding:1px 6px;border-radius:6px;font-variant-numeric:tabular-nums;}
+.rv-bg-arrow-up{background:#34C75920;color:#1B7A3A;}
+.rv-bg-arrow-down{background:#FF3B3020;color:#A02020;}
+.rv-bg-arrow-flat{background:var(--grp);color:var(--sec);}
 .rv-bg-empty{padding:14px;text-align:center;font-size:12px;color:var(--sec);background:var(--grp);border-radius:10px;line-height:1.5;}
 
 /* ══════ TIMER STYLES ══════ */
@@ -1859,6 +1863,138 @@ function formatGoalMinutes(minutesByGoal,total){
   return{lines,totalMin:total};
 }
 
+/* ══════════════════════════════════════════════
+   WEEKLY ARCHIVE — 주차별 회고 데이터 누적 (v16)
+   users/{uid}/weeklyArchive/{ISO주차}
+   ══════════════════════════════════════════════ */
+function getISOWeekId(date){
+  const d=new Date(Date.UTC(date.getFullYear(),date.getMonth(),date.getDate()));
+  const dayNum=d.getUTCDay()||7;
+  d.setUTCDate(d.getUTCDate()+4-dayNum);
+  const yearStart=new Date(Date.UTC(d.getUTCFullYear(),0,1));
+  const weekNo=Math.ceil((((d-yearStart)/86400000)+1)/7);
+  return`${d.getUTCFullYear()}-W${String(weekNo).padStart(2,'0')}`;
+}
+function fmtDateISO(d){return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+
+// 한국어 + 영문 단순 토큰화 + 빈도 (LLM에 빈도 계산 시키지 않기 위함)
+const KEYWORD_STOPWORDS=new Set(['그리고','하지만','그래서','이거','저거','이것','저것','내일','오늘','어제','있는','없는','하는','한다','한번','지금','조금','정말','너무','다시','그냥','진짜','약간','계속','아직','이제','vs','and','the','for','with','from','this','that']);
+function extractTopKeywords(text,n){
+  if(!text||!text.trim())return[];
+  const tokens=text.toLowerCase().replace(/[^\w가-힣\s]/g,' ').split(/\s+/).filter(t=>t.length>=2);
+  const freq={};
+  tokens.forEach(t=>{if(KEYWORD_STOPWORDS.has(t))return;freq[t]=(freq[t]||0)+1;});
+  return Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,n||5).map(([word,count])=>({word,count}));
+}
+
+// 특정 주의 archive 데이터 계산 (Firestore 저장 포맷)
+async function computeWeeklyArchive(monday){
+  const wid=getWeekId(monday);
+  let snap;
+  if(curWeekStart&&getWeekId(curWeekStart)===wid){snap=weekData;}
+  else{
+    const loaded=await loadWeekData(wid);
+    snap={blocks:(loaded&&loaded.blocks)||[]};
+    snap.blocks.forEach(migrateBlock);
+  }
+  const blocks=snap.blocks||[];
+  // 1) goalDistribution + doneMin
+  const minByGoal={};let doneMin=0;
+  blocks.forEach(b=>{
+    if(b.status!=='done'||b.actualStart==null||b.actualEnd==null||!b.goalId)return;
+    const m=Math.max(0,b.actualEnd-b.actualStart);
+    if(m<=0)return;
+    minByGoal[b.goalId]=(minByGoal[b.goalId]||0)+m;
+    doneMin+=m;
+  });
+  const goalDistribution=bigGoals.map(g=>({
+    goalId:g.id,goalTitle:g.title,
+    hours:+(((minByGoal[g.id]||0)/60).toFixed(2)),
+    percentage:doneMin>0?Math.round((minByGoal[g.id]||0)/doneMin*100):0
+  })).filter(x=>x.hours>0);
+  // 2) totalMin (전체 계획 합)
+  const totalMin=blocks.reduce((s,b)=>s+Math.max(0,b.endMin-b.startMin),0);
+  // 3) spontaneousMin (즉흥 done actual)
+  let spontaneousMin=0;
+  blocks.forEach(b=>{if(b.status==='done'&&b.origin==='spontaneous'&&b.actualStart!=null&&b.actualEnd!=null)spontaneousMin+=Math.max(0,b.actualEnd-b.actualStart);});
+  // 4) pendingMin (미완 블록 계획 시간)
+  let pendingMin=0;
+  blocks.forEach(b=>{if(b.status!=='done')pendingMin+=Math.max(0,b.endMin-b.startMin);});
+  // 5) hourlyDistribution[24] — done 블록의 시간대별 actual 분
+  const hourly=new Array(24).fill(0);
+  blocks.forEach(b=>{
+    if(b.status!=='done'||b.actualStart==null||b.actualEnd==null)return;
+    let cur=b.actualStart;
+    while(cur<b.actualEnd){
+      const hr=Math.floor(cur/60);
+      const segEnd=Math.min((hr+1)*60,b.actualEnd);
+      if(hr>=0&&hr<24)hourly[hr]+=(segEnd-cur);
+      cur=segEnd;
+    }
+  });
+  // 6) 카드 통계 (이번 주 task)
+  const monIso=monday.toISOString();
+  const next=new Date(monday);next.setDate(next.getDate()+7);
+  const nextIso=next.toISOString();
+  const weekTasks=tasks.filter(t=>t.createdAt&&t.createdAt>=monIso&&t.createdAt<nextIso);
+  const cardsCreated=weekTasks.length;
+  const cardsCompleted=weekTasks.filter(t=>t.done).length;
+  // 7) 키워드 (카드 + 메모 텍스트 합)
+  const allText=weekTasks.map(t=>t.text||'').join(' ');
+  const topKeywords=extractTopKeywords(allText,5);
+  // 8) plannedVsActualDiff (done planned 블록만)
+  let diffSum=0,diffCount=0;
+  blocks.forEach(b=>{
+    if(b.status==='done'&&b.origin==='planned'&&b.actualStart!=null&&b.actualEnd!=null){
+      const planned=b.endMin-b.startMin;
+      const actual=b.actualEnd-b.actualStart;
+      diffSum+=(actual-planned);diffCount++;
+    }
+  });
+  const plannedVsActualDiff={avgMinutes:diffCount>0?Math.round(diffSum/diffCount):0,totalBlocks:diffCount};
+  const sun=new Date(monday);sun.setDate(sun.getDate()+6);
+  return{
+    weekStart:fmtDateISO(monday),
+    weekEnd:fmtDateISO(sun),
+    goalDistribution,
+    totalHours:+(totalMin/60).toFixed(2),
+    doneHours:+(doneMin/60).toFixed(2),
+    spontaneousHours:+(spontaneousMin/60).toFixed(2),
+    pendingHours:+(pendingMin/60).toFixed(2),
+    hourlyDistribution:hourly.map(m=>+(m/60).toFixed(2)),
+    cardsCreated,cardsCompleted,topKeywords,plannedVsActualDiff,
+    archivedAt:new Date().toISOString()
+  };
+}
+
+async function saveWeeklyArchive(monday){
+  const data=await computeWeeklyArchive(monday);
+  const wid=getISOWeekId(monday);
+  if(PREVIEW_BYPASS){
+    localStorage.setItem('preview_archive_'+wid,JSON.stringify(data));
+    return{wid,data};
+  }
+  if(!CU)return null;
+  try{
+    await db.collection('users').doc(CU.uid).collection('weeklyArchive').doc(wid).set(data);
+    return{wid,data};
+  }catch(e){
+    console.error('[saveWeeklyArchive]',e);
+    if(e.code==='permission-denied')showToast('회고 기록 권한 없음 — Firestore 규칙 확인 필요');
+    return null;
+  }
+}
+
+async function loadOneArchive(weekId){
+  if(PREVIEW_BYPASS){
+    try{const raw=localStorage.getItem('preview_archive_'+weekId);return raw?JSON.parse(raw):null;}
+    catch{return null;}
+  }
+  if(!CU)return null;
+  try{const doc=await db.collection('users').doc(CU.uid).collection('weeklyArchive').doc(weekId).get();return doc.exists?doc.data():null;}
+  catch{return null;}
+}
+
 async function callDailySummaryAI(texts){
   if(!Array.isArray(texts)||!texts.length)return'요약할 데이터가 없어요.';
   const safe=texts.filter(t=>typeof t==='string'&&t.trim()).slice(0,15);
@@ -1926,42 +2062,39 @@ function renderWeeklyModal(){
 async function renderBigGoalsInWeekly(){
   const sec=document.getElementById('rvSecBigGoals'),list=document.getElementById('rvBigGoalList');
   if(!bigGoals.length){sec.style.display='none';return;}
-  // 이번 주 데이터 (현재 보고 있는 주가 다른 주여도 회고는 항상 이번 주 기준)
-  const thisWid=getWeekId(new Date());
-  let snap;
-  if(curWeekStart&&getWeekId(curWeekStart)===thisWid){
-    snap=weekData;
-  }else{
-    const loaded=await loadWeekData(thisWid);
-    snap={
-        blocks:(loaded&&loaded.blocks)||[]
-    };
-    snap.blocks.forEach(migrateBlock);
-  }
-  // done 블록만 + actual 시간 합산 (모든 블록은 goalId 보장됨)
-  const minutesByGoal={};
-  let totalMin=0;
-  (snap.blocks||[]).forEach(b=>{
-    if(b.status!=='done')return;
-    if(b.actualStart==null||b.actualEnd==null)return;
-    const min=Math.max(0,b.actualEnd-b.actualStart);
-    if(min<=0||!b.goalId)return;
-    minutesByGoal[b.goalId]=(minutesByGoal[b.goalId]||0)+min;
-    totalMin+=min;
-  });
+  // 이번 주 archive 데이터로 계산 (저장 전이라도 즉석 계산)
+  const monday=monWk(new Date());
+  const thisArch=await computeWeeklyArchive(monday);
+  // 지난 주 archive 로드 (있으면 화살표용)
+  const lastWeek=new Date(monday);lastWeek.setDate(lastWeek.getDate()-7);
+  const lastArch=await loadOneArchive(getISOWeekId(lastWeek));
   sec.style.display='';
-  if(totalMin===0){
+  if(thisArch.doneHours===0){
     list.innerHTML='<div class="rv-bg-empty">완료된 시간 블록이 아직 없어요.<br>블록을 더블클릭해서 ✓ 완료 처리해 보세요.</div>';
     return;
   }
-  // 행 구성: 사용자 정의 큰 목표 (시간 큰 순) → 일상 (항상 마지막, 시간 무관)
-  const userGoals=getUserGoals().filter(g=>(minutesByGoal[g.id]||0)>0).sort((a,b)=>(minutesByGoal[b.id]||0)-(minutesByGoal[a.id]||0));
-  const daily=getDailyGoal();
-  const rows=userGoals.map(g=>({title:g.title,color:g.color,min:minutesByGoal[g.id]}));
-  if(daily&&(minutesByGoal[daily.id]||0)>0)rows.push({title:daily.title,color:daily.color,min:minutesByGoal[daily.id]});
-  list.innerHTML=rows.map(r=>{
-    const pct=Math.round(r.min/totalMin*100);
-    return`<div class="rv-bg-row"><span class="rv-bg-dot" style="background:${r.color}"></span><span class="rv-bg-title">${esc(r.title)}</span><span class="rv-bg-time">${fmtHrMin(r.min)} (${pct}%)</span></div>`;
+  // 사용자 정의 → 일상 순서, archive의 goalDistribution 기반
+  const dist=thisArch.goalDistribution.slice();
+  const dailyId=getDailyGoal()?.id;
+  dist.sort((a,b)=>{
+    if(a.goalId===dailyId)return 1;
+    if(b.goalId===dailyId)return -1;
+    return b.hours-a.hours;
+  });
+  list.innerHTML=dist.map(d=>{
+    const goal=bigGoals.find(g=>g.id===d.goalId);
+    const color=goal?goal.color:DAILY_GOAL_COLOR;
+    // 화살표 (지난 주 대비 시간 차이)
+    let arrowHTML='';
+    if(lastArch){
+      const last=lastArch.goalDistribution.find(x=>x.goalId===d.goalId);
+      const diffH=d.hours-(last?last.hours:0);
+      const diffMin=Math.round(diffH*60);
+      if(Math.abs(diffMin)<30){arrowHTML=`<span class="rv-bg-arrow rv-bg-arrow-flat" title="지난 주와 비슷">→</span>`;}
+      else if(diffMin>0){arrowHTML=`<span class="rv-bg-arrow rv-bg-arrow-up" title="지난 주 대비">↑+${fmtHrMin(diffMin)}</span>`;}
+      else{arrowHTML=`<span class="rv-bg-arrow rv-bg-arrow-down" title="지난 주 대비">↓-${fmtHrMin(Math.abs(diffMin))}</span>`;}
+    }
+    return`<div class="rv-bg-row"><span class="rv-bg-dot" style="background:${color}"></span><span class="rv-bg-title">${esc(d.goalTitle)}</span>${arrowHTML}<span class="rv-bg-time">${fmtHrMin(Math.round(d.hours*60))} (${d.percentage}%)</span></div>`;
   }).join('');
 }
 
@@ -1999,10 +2132,14 @@ async function checkWeekly(){try{
 }catch(e){console.error('[checkWeekly]',e);}}
 
 async function openWeeklyManual(){
-  // v16: AI 4역할은 Step 4에서 구현 예정. 지금은 데이터 섹션과 placeholder만.
+  // v16 Step 2: archive 저장 + 화면 렌더
   renderWeeklyModal();
   const wLogs=await loadWeekTimeLogs();renderTimeLogsInWeekly(wLogs);
   document.getElementById('rvMo').classList.add('open');
+  // 이번 주 archive 자동 저장 (덮어쓰기) — 완료되면 화살표 갱신
+  const monday=monWk(new Date());
+  await saveWeeklyArchive(monday);
+  await renderBigGoalsInWeekly(); // archive 저장 후 화살표 표시 위해 재렌더
 }
 
 async function shareWeeklyMemos(){const mon=monWk(new Date()).toISOString();const memos=tasks.filter(t=>t.category==='memo'&&t.createdAt>=mon);if(!memos.length){showToast('공유할 메모 없음');return;}const text='🧠 이번 주 Brain Dump 메모\n\n'+memos.map(t=>'• '+t.text).join('\n');if(navigator.share){try{await navigator.share({title:'이번 주 메모',text});}catch(e){if(e.name!=='AbortError')showToast('공유 실패');}}else{try{await navigator.clipboard.writeText(text);showToast('클립보드에 복사됨');}catch{showToast('복사 실패');}}}
