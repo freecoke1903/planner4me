@@ -398,8 +398,7 @@ body.view-week.mode-popup .p-week{display:flex;}
 .wp-block.link-target{outline:3px dashed #fff;outline-offset:-3px;transform:scale(1.04);box-shadow:0 4px 14px rgba(0,0,0,.25);}
 .wp-block.link-blocked{cursor:not-allowed;opacity:.6;}
 .wp-block.split-preview{width:49%!important;justify-self:start!important;margin-left:0!important;transition:width .18s ease,margin-left .18s ease;}
-.wp-slot-preview{background:rgba(255,255,255,.55);border:2px dashed var(--blue);border-radius:6px;margin:1px 2px;display:flex;align-items:center;justify-content:center;color:var(--blue);font-size:12px;font-weight:700;pointer-events:none;z-index:3;animation:slotPulse .9s infinite alternate;}
-@keyframes slotPulse{from{opacity:.55;transform:scale(.98)}to{opacity:1;transform:scale(1)}}
+.wp-slot-preview{background:#34C75940;border:2px solid #34C759;border-radius:6px;margin:1px 2px;display:flex;align-items:center;justify-content:center;color:#1B7A3A;font-size:11px;font-weight:700;pointer-events:none;z-index:3;font-variant-numeric:tabular-nums;}
 
 @media(max-width:480px){
   .wp-top{padding:10px 12px 8px;}
@@ -887,28 +886,33 @@ function renderWeekView(){
   drawNowLine();
 }
 
-let _dragType=null,_justDragged=false,_draggingBlockId=null,_currentSplitTargetId=null;
-function showSplitPreview(targetBlock,grid){
-  if(_currentSplitTargetId===targetBlock.dataset.blockId)return; // 같은 블록 위 dragover 연속 → 유지 (깜빡임 방지)
+let _dragType=null,_justDragged=false,_draggingBlockId=null,_currentDropKey=null;
+// 드롭 위치 미리보기 (빈 셀 / split 모두 동일 시각)
+function showDropPreview(grid,day,startMin,dur,splitTargetEl){
+  const key=`${day}-${startMin}-${dur}-${splitTargetEl?splitTargetEl.dataset.blockId:''}`;
+  if(_currentDropKey===key)return; // 깜빡임 방지
   removeSplitPreview();
-  _currentSplitTargetId=targetBlock.dataset.blockId;
-  targetBlock.classList.add('split-preview');
+  _currentDropKey=key;
+  const startRow=Math.floor(startMin/30);
+  const endRow=Math.ceil((startMin+dur)/30);
   const ph=document.createElement('div');
   ph.className='wp-slot-preview';
   ph.id='wpSlotPreview';
-  ph.textContent='+ 새 슬롯';
-  const cs=getComputedStyle(targetBlock);
-  ph.style.gridColumn=cs.gridColumnStart;
-  ph.style.gridRow=`${cs.gridRowStart} / ${cs.gridRowEnd}`;
-  ph.style.width='49%';
-  ph.style.justifySelf='start';
-  ph.style.marginLeft='51%';
+  ph.textContent=`${fmtMin(startMin)} – ${fmtMin(Math.min(startMin+dur,1440))}`;
+  ph.style.gridColumn=String(day+2);
+  ph.style.gridRow=`${startRow+2} / ${endRow+2}`;
+  if(splitTargetEl){
+    splitTargetEl.classList.add('split-preview');
+    ph.style.width='49%';
+    ph.style.justifySelf='start';
+    ph.style.marginLeft='51%';
+  }
   grid.appendChild(ph);
 }
 function removeSplitPreview(){
   document.querySelectorAll('.wp-block.split-preview').forEach(b=>b.classList.remove('split-preview'));
   const old=document.getElementById('wpSlotPreview');if(old)old.remove();
-  _currentSplitTargetId=null;
+  _currentDropKey=null;
 }
 function bindWeekDnD(container){
   container.querySelectorAll('.wp-sb-card').forEach(c=>{
@@ -944,34 +948,29 @@ function bindWeekDnD(container){
     container.querySelectorAll('.wp-block.link-target,.wp-block.link-blocked').forEach(b=>b.classList.remove('link-target','link-blocked'));
     container.querySelectorAll('.wp-cell.dragover').forEach(c=>c.classList.remove('dragover'));
     if(_dragType==='block'){
-      // cell 우선: 사용자가 떨어뜨릴 행의 시간(cellMin)으로 검증.
-      // 셀이 안 잡히면 (블록 본체 직접 위) → 병렬 분할 폴백 (block 시작)
-      let targetBlockEl=null,targetBlock=null,checkDay=null,checkStart=null;
+      const draggingB=weekData.blocks.find(x=>x.id===_draggingBlockId);
+      if(!draggingB){removeSplitPreview();stopAutoScroll();return;}
+      const dur=draggingB.endMin-draggingB.startMin;
+      // cell 우선: 떨어뜨릴 행의 시간으로 검증 + 미리보기.
+      // 셀이 안 잡힌 경우(블록 본체 직접 위) → 병렬 분할 폴백 (block 시작)
+      let dropDay=null,dropStart=null,splitTargetEl=null;
       if(cell){
-        const cd=parseInt(cell.dataset.day),cr=parseInt(cell.dataset.row),cellMin=cr*30;
-        checkDay=cd;checkStart=cellMin;
-        const occ=weekData.blocks.find(b=>b.id!==_draggingBlockId&&b.day===cd&&b.startMin<=cellMin&&b.endMin>cellMin);
-        if(occ){targetBlock=occ;targetBlockEl=container.querySelector(`.wp-block[data-block-id="${occ.id}"]`);}
+        dropDay=parseInt(cell.dataset.day);
+        dropStart=parseInt(cell.dataset.row)*30;
+        const occ=weekData.blocks.find(b=>b.id!==_draggingBlockId&&b.day===dropDay&&b.startMin<=dropStart&&b.endMin>dropStart);
+        if(occ)splitTargetEl=container.querySelector(`.wp-block[data-block-id="${occ.id}"]`);
       }else if(block&&block.dataset.blockId&&block.dataset.blockId!==_draggingBlockId){
-        targetBlockEl=block;
-        targetBlock=weekData.blocks.find(x=>x.id===block.dataset.blockId);
-        if(targetBlock){checkDay=targetBlock.day;checkStart=targetBlock.startMin;}
+        const tb=weekData.blocks.find(x=>x.id===block.dataset.blockId);
+        if(tb){dropDay=tb.day;dropStart=tb.startMin;splitTargetEl=block;}
       }
-      if(targetBlock&&targetBlockEl){
-        const draggingB=weekData.blocks.find(x=>x.id===_draggingBlockId);
-        if(draggingB){
-          const dur=draggingB.endMin-draggingB.startMin;
-          const newEnd=Math.min(checkStart+dur,1440);
-          if(canAddBlock(checkDay,checkStart,newEnd,_draggingBlockId)){
-            e.preventDefault();e.dataTransfer.dropEffect='move';
-            showSplitPreview(targetBlockEl,grid);
-          }else{
-            e.dataTransfer.dropEffect='none';removeSplitPreview();
-          }
+      if(dropDay!==null&&dropStart!==null){
+        const newEnd=Math.min(dropStart+dur,1440);
+        if(canAddBlock(dropDay,dropStart,newEnd,_draggingBlockId)){
+          e.preventDefault();e.dataTransfer.dropEffect='move';
+          showDropPreview(grid,dropDay,dropStart,dur,splitTargetEl);
+        }else{
+          e.dataTransfer.dropEffect='none';removeSplitPreview();
         }
-      }else if(cell){
-        e.preventDefault();e.dataTransfer.dropEffect='move';cell.classList.add('dragover');
-        removeSplitPreview();
       }else{removeSplitPreview();stopAutoScroll();return;}
     }else if(_dragType==='card'){
       if(block){
