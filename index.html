@@ -944,22 +944,25 @@ function bindWeekDnD(container){
     container.querySelectorAll('.wp-block.link-target,.wp-block.link-blocked').forEach(b=>b.classList.remove('link-target','link-blocked'));
     container.querySelectorAll('.wp-cell.dragover').forEach(c=>c.classList.remove('dragover'));
     if(_dragType==='block'){
-      // 마우스가 block 외부(49% 줄어든 영역 밖)에 있어도 그 cell 위치에 block 있으면 split target으로 인식
-      let targetBlockEl=null,targetBlock=null;
-      if(block&&block.dataset.blockId&&block.dataset.blockId!==_draggingBlockId){
-        targetBlockEl=block;
-        targetBlock=weekData.blocks.find(x=>x.id===block.dataset.blockId);
-      }else if(cell){
+      // cell 우선: 사용자가 떨어뜨릴 행의 시간(cellMin)으로 검증.
+      // 셀이 안 잡히면 (블록 본체 직접 위) → 병렬 분할 폴백 (block 시작)
+      let targetBlockEl=null,targetBlock=null,checkDay=null,checkStart=null;
+      if(cell){
         const cd=parseInt(cell.dataset.day),cr=parseInt(cell.dataset.row),cellMin=cr*30;
+        checkDay=cd;checkStart=cellMin;
         const occ=weekData.blocks.find(b=>b.id!==_draggingBlockId&&b.day===cd&&b.startMin<=cellMin&&b.endMin>cellMin);
         if(occ){targetBlock=occ;targetBlockEl=container.querySelector(`.wp-block[data-block-id="${occ.id}"]`);}
+      }else if(block&&block.dataset.blockId&&block.dataset.blockId!==_draggingBlockId){
+        targetBlockEl=block;
+        targetBlock=weekData.blocks.find(x=>x.id===block.dataset.blockId);
+        if(targetBlock){checkDay=targetBlock.day;checkStart=targetBlock.startMin;}
       }
       if(targetBlock&&targetBlockEl){
         const draggingB=weekData.blocks.find(x=>x.id===_draggingBlockId);
         if(draggingB){
           const dur=draggingB.endMin-draggingB.startMin;
-          const newEnd=Math.min(targetBlock.startMin+dur,1440);
-          if(canAddBlock(targetBlock.day,targetBlock.startMin,newEnd,_draggingBlockId)){
+          const newEnd=Math.min(checkStart+dur,1440);
+          if(canAddBlock(checkDay,checkStart,newEnd,_draggingBlockId)){
             e.preventDefault();e.dataTransfer.dropEffect='move';
             showSplitPreview(targetBlockEl,grid);
           }else{
@@ -1006,18 +1009,15 @@ function bindWeekDnD(container){
       const cell=e.target.closest('.wp-cell');
       const b=weekData.blocks.find(x=>x.id===data.id);if(!b)return;
       let newDay,newStart;
-      let tb=null;
-      if(targetBlock&&targetBlock.dataset.blockId!==data.id){
-        tb=weekData.blocks.find(x=>x.id===targetBlock.dataset.blockId);
-      }else if(cell){
-        // cell 위치에 다른 block이 있으면 그 block을 target으로 (49%로 줄어 들어 cell이 잡힌 경우)
-        const cd=parseInt(cell.dataset.day),cr=parseInt(cell.dataset.row),cellMin=cr*30;
-        tb=weekData.blocks.find(x=>x.id!==data.id&&x.day===cd&&x.startMin<=cellMin&&x.endMin>cellMin);
-      }
-      if(tb){
+      // cell 우선: 사용자가 떨어뜨린 행의 시간을 그대로 사용 (49% 줄어든 블록의 우측 영역도 cell)
+      if(cell){
+        newDay=parseInt(cell.dataset.day);
+        newStart=parseInt(cell.dataset.row)*30;
+      }else if(targetBlock&&targetBlock.dataset.blockId!==data.id){
+        // 셀이 안 잡힌 경우 (블록 본체 직접 위 drop) → 병렬 분할 폴백 (block 시작으로)
+        const tb=weekData.blocks.find(x=>x.id===targetBlock.dataset.blockId);
+        if(!tb)return;
         newDay=tb.day;newStart=tb.startMin;
-      }else if(cell){
-        newDay=parseInt(cell.dataset.day);newStart=parseInt(cell.dataset.row)*30;
       }else return;
       if(b.day===newDay&&b.startMin===newStart)return;
       const duration=b.endMin-b.startMin;
