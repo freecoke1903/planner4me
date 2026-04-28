@@ -1384,30 +1384,57 @@ let CU=null,tasks=[],pinnedId=null,unsub=null,curFilter='today';
    BIG GOALS — 분기/연 단위 큰 목표 (users/{uid}/goals)
    ══════════════════════════════════════════════ */
 const BIG_GOAL_PALETTE=['#FF3B30','#FFCC00','#5AC8FA','#FF2D55']; // 빨/노/하늘/핑크 (카테고리 색과 안 겹침)
-const MAX_BIG_GOALS=3;
+const DAILY_GOAL_COLOR='#9CA3AF'; // 회색 — 시스템 "일상" 큰 목표 전용
+const DAILY_GOAL_TITLE='일상'; // 기본 제목 (사용자가 수정 가능)
+const MAX_BIG_GOALS=3; // 사용자 정의 큰 목표 최대 (일상은 별도)
 let bigGoals=[]; // 클라 캐시
 let _bigGoalsUnsub=null;
 let _editingBigGoalId=null;
 
 function pickGoalColor(existing){
-  const used=new Set((existing||[]).map(g=>g.color));
-  return BIG_GOAL_PALETTE.find(c=>!used.has(c))||BIG_GOAL_PALETTE[(existing||[]).length%BIG_GOAL_PALETTE.length];
+  // 일상은 색 팔레트와 무관하므로 사용자 정의만 고려
+  const userOnly=(existing||[]).filter(g=>!g||g.isSystem!==true);
+  const used=new Set(userOnly.map(g=>g.color));
+  return BIG_GOAL_PALETTE.find(c=>!used.has(c))||BIG_GOAL_PALETTE[userOnly.length%BIG_GOAL_PALETTE.length];
 }
 function newBigGoalId(){return'bg-'+Date.now().toString(36)+'-'+Math.floor(Math.random()*1000).toString(36);}
+function getDailyGoal(){return bigGoals.find(g=>g&&g.isSystem===true);}
+function getUserGoals(){return bigGoals.filter(g=>!g||g.isSystem!==true);}
+
+let _ensuringDaily=false;
+async function ensureDailyGoal(){
+  // 시스템 "일상" 큰 목표가 없으면 자동 생성. 동시 호출 방지 가드 포함
+  if(getDailyGoal())return;
+  if(_ensuringDaily)return;
+  _ensuringDaily=true;
+  try{
+    const id=PREVIEW_BYPASS?newBigGoalId():db.collection('users').doc(CU.uid).collection('goals').doc().id;
+    const now=new Date().toISOString();
+    const data={id,title:DAILY_GOAL_TITLE,color:DAILY_GOAL_COLOR,isSystem:true,createdAt:now,updatedAt:now,order:-1};
+    if(PREVIEW_BYPASS){
+      bigGoals.unshift(data);saveBigGoalsPreview();renderBigGoals();return;
+    }
+    await db.collection('users').doc(CU.uid).collection('goals').doc(id).set(data);
+  }catch(e){console.error('[ensureDailyGoal]',e);}
+  finally{_ensuringDaily=false;}
+}
 
 async function loadBigGoalsListen(){
   if(_bigGoalsUnsub){_bigGoalsUnsub();_bigGoalsUnsub=null;}
   if(PREVIEW_BYPASS){
     try{const raw=localStorage.getItem('preview_big_goals');bigGoals=raw?JSON.parse(raw):[];}
     catch{bigGoals=[];}
+    await ensureDailyGoal();
     renderBigGoals();return;
   }
   if(!CU){bigGoals=[];renderBigGoals();return;}
   _bigGoalsUnsub=db.collection('users').doc(CU.uid).collection('goals').orderBy('order','asc')
-    .onSnapshot(snap=>{
+    .onSnapshot(async snap=>{
       bigGoals=snap.docs.map(d=>({id:d.id,...d.data()}));
+      // 첫 응답인데 일상이 없으면 자동 생성 (생성 후 onSnapshot이 다시 발화)
+      if(!getDailyGoal()){await ensureDailyGoal();return;}
       renderBigGoals();
-      // 그리드의 🎯 stale 필터링 위해 다시 그림
+      // 그리드 색/배지 갱신
       if(curWeekStart)renderWeekView();
     },err=>{
       console.error('[bigGoals]',err);
@@ -1437,11 +1464,14 @@ async function updateBigGoalTitle(id,title){
 }
 async function deleteBigGoalConfirm(id){
   const g=bigGoals.find(x=>x.id===id);if(!g)return;
-  if(!confirm(`"${g.title}" 큰 목표를 삭제할까요?\n연결된 시간 블록은 보존되고, 큰 목표 연결만 풀려요.`))return;
-  // 1) 현재 주 weekData의 블록 goalId 정리
+  if(g.isSystem){showToast('"일상"은 시스템 기본값이라 삭제할 수 없어요');return;}
+  if(!confirm(`"${g.title}" 큰 목표를 삭제할까요?\n연결된 시간 블록은 "일상"으로 옮겨져요.`))return;
+  // 1) 현재 주 weekData의 블록 goalId를 "일상"으로 옮김
+  const daily=getDailyGoal();
+  const fallbackId=daily?daily.id:null;
   if(curWeekStart&&Array.isArray(weekData.blocks)){
     let changed=false;
-    weekData.blocks.forEach(b=>{if(b.goalId===id){b.goalId=null;changed=true;}});
+    weekData.blocks.forEach(b=>{if(b.goalId===id){b.goalId=fallbackId;changed=true;}});
     if(changed)await saveWeekData(getWeekId(curWeekStart),weekData);
   }
   // 2) Firestore에서 삭제
@@ -1467,20 +1497,29 @@ async function confirmBigGoal(){
   closeBigGoalMo();
 }
 async function startNewBigGoalFlow(){
-  if(bigGoals.length>=MAX_BIG_GOALS){
-    if(!confirm(`이미 ${bigGoals.length}개의 큰 목표가 있어요. 너무 많으면 분산돼요. 정말 추가할까요?`))return;
+  const userCount=getUserGoals().length;
+  if(userCount>=MAX_BIG_GOALS){
+    if(!confirm(`이미 ${userCount}개의 큰 목표가 있어요. 너무 많으면 분산돼요. 정말 추가할까요?`))return;
   }
   openBigGoalMo();
 }
 
 function renderBigGoals(){
   document.querySelectorAll('.bg-goals-mount').forEach(mount=>{
-    if(!bigGoals.length){
+    // "일상"이 항상 마지막에 오도록 정렬: 사용자 정의 → 일상
+    const userGoals=getUserGoals();
+    const daily=getDailyGoal();
+    const ordered=daily?[...userGoals,daily]:userGoals;
+    if(!ordered.length){
       mount.innerHTML=`<div class="bg-goals-title">🎯 이번 분기 큰 목표</div><div class="bg-goals-empty">분기/연 단위 큰 목표를 정하면 시간 분배가 보여요.</div><button class="bg-goal-add" onclick="startNewBigGoalFlow()">+ 큰 목표 추가</button>`;
       return;
     }
     let h=`<div class="bg-goals-title">🎯 이번 분기 큰 목표</div>`;
-    h+=bigGoals.map(g=>`<div class="bg-goal-item"><span class="bg-goal-dot" style="background:${g.color}"></span><span class="bg-goal-title">${esc(g.title)}</span><button class="bg-goal-act" onclick="openBigGoalMo('${g.id}')" title="수정">✏️</button><button class="bg-goal-act del" onclick="deleteBigGoalConfirm('${g.id}')" title="삭제">🗑️</button></div>`).join('');
+    h+=ordered.map(g=>{
+      const editBtn=`<button class="bg-goal-act" onclick="openBigGoalMo('${g.id}')" title="수정">✏️</button>`;
+      const delBtn=g.isSystem?'':`<button class="bg-goal-act del" onclick="deleteBigGoalConfirm('${g.id}')" title="삭제">🗑️</button>`;
+      return`<div class="bg-goal-item"><span class="bg-goal-dot" style="background:${g.color}"></span><span class="bg-goal-title">${esc(g.title)}</span>${editBtn}${delBtn}</div>`;
+    }).join('');
     h+=`<button class="bg-goal-add" onclick="startNewBigGoalFlow()">+ 큰 목표 추가</button>`;
     mount.innerHTML=h;
   });
