@@ -197,6 +197,14 @@ body.mode-dash .view-popup{display:none!important;}
 .ctx-done-item .cdi-check{width:20px;height:20px;border-radius:50%;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;}
 .ctx-done-item .cdi-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .ctx-brain{padding:12px 14px;background:linear-gradient(135deg,#F0E6FA,#EBF2FA);border-radius:12px;font-size:14px;font-weight:500;line-height:1.55;min-height:44px;display:flex;align-items:center;}
+.ctx-brain.rv-ai{display:block;align-items:initial;font-weight:400;padding:14px 16px;}
+.rv-ai h4{font-size:12px;font-weight:700;color:var(--sec);text-transform:uppercase;letter-spacing:.4px;margin:14px 0 6px;padding-bottom:4px;border-bottom:1px solid rgba(0,0,0,.06);}
+.rv-ai h4:first-child{margin-top:0;}
+.rv-ai p{font-size:13.5px;line-height:1.6;color:var(--label);margin:6px 0;font-weight:500;}
+.rv-ai ul{margin:6px 0 6px 0;padding-left:18px;}
+.rv-ai li{font-size:13.5px;line-height:1.6;color:var(--label);margin:3px 0;font-weight:500;}
+.rv-ai strong{color:var(--label);font-weight:700;}
+.rv-ai em{color:var(--blue);font-style:normal;font-weight:600;}
 .ctx-brain-loading{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--sec);}
 .ctx-baton-list{display:flex;flex-direction:column;gap:5px;}
 .ctx-baton-btn{display:flex;align-items:center;gap:10px;width:100%;padding:12px 14px;background:var(--surface);border:1.5px solid var(--sep);border-radius:12px;font-family:inherit;font-size:14px;font-weight:500;color:var(--label);text-align:left;cursor:pointer;transition:all .2s;line-height:1.4;}
@@ -232,6 +240,12 @@ body.mode-dash .view-popup{display:none!important;}
 .rv-share-btn:hover{background:#F0F6FF;}
 .rv-archive-btn{width:100%;padding:11px;border:none;border-radius:12px;background:var(--red);font-family:inherit;font-size:14px;font-weight:600;color:#fff;cursor:pointer;text-align:center;transition:all .2s;}
 .rv-archive-btn:hover{filter:brightness(1.1);}
+.rv-hdr{margin:-4px -2px 14px;padding-bottom:12px;border-bottom:1px solid var(--sep);}
+.rv-hdr-title{font-size:20px;font-weight:700;color:var(--label);margin-bottom:4px;}
+.rv-hdr-week{font-size:12px;color:var(--sec);font-weight:600;letter-spacing:.2px;}
+.rv-box .ctx-section{margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--sep);}
+.rv-box .ctx-section:last-of-type{border-bottom:none;padding-bottom:0;}
+.rv-box .ctx-sec-title{font-size:11px;font-weight:700;color:var(--sec);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;}
 .rv-bg-row{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--grp);border-radius:10px;margin-bottom:6px;font-size:13px;line-height:1.4;}
 .rv-bg-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
 .rv-bg-title{flex:1;color:var(--label);font-weight:500;word-break:break-word;}
@@ -486,9 +500,11 @@ body.view-week.mode-popup .p-week{display:flex;}
 </div></div>
 
 <!-- Weekly Review -->
-<div class="mo" id="rvMo"><div class="mo-box" style="max-width:400px">
-  <div class="mo-t" style="font-size:20px">📊 주간 회고</div>
-  <div class="mo-d" style="margin-bottom:14px">한 주의 흐름을 돌아봐요.</div>
+<div class="mo" id="rvMo"><div class="mo-box rv-box" style="max-width:460px">
+  <div class="rv-hdr">
+    <div class="rv-hdr-title">📊 주간 회고</div>
+    <div class="rv-hdr-week" id="rvWeekLabel"></div>
+  </div>
   <div class="ctx-section" id="rvSecBigGoals" style="display:none"><div class="ctx-sec-title">🎯 큰 목표 시간 분배</div><div id="rvBigGoalList"></div></div>
   <div class="ctx-section" id="rvSecA"><div class="ctx-sec-title">💬 이번 주의 궤적</div><div class="ctx-brain" id="rvAiSummary"><div class="ctx-brain-loading"><div class="g-sp"></div>분석 중...</div></div></div>
   <div class="ctx-section" id="rvSecTime" style="display:none"><div class="ctx-sec-title">⏱️ 이번 주의 몰입 기록</div><div id="rvTimeList"></div></div>
@@ -1715,7 +1731,7 @@ function toggleArchDd(id,evt){if(evt)evt.stopPropagation();document.querySelecto
 /* ══════════════════════════════════════════════
    DAILY — 캐싱 + 수동 열기 + TimeLogs
    ══════════════════════════════════════════════ */
-function dailyCacheKey(){return 'daily_summary_'+getTodayISO().replace(/-/g,'');}
+function dailyCacheKey(){return 'daily_summary_v2_'+getTodayISO().replace(/-/g,'');}
 
 function renderDailyModal(aiText){
   const yDate=new Date(Date.now()-864e5),yStr=yDate.toDateString();
@@ -1725,7 +1741,7 @@ function renderDailyModal(aiText){
   if(doneYesterday.length){secA.style.display='';doneList.innerHTML=doneYesterday.slice(0,2).map(t=>`<div class="ctx-done-item"><div class="cdi-check">✓</div><div class="cdi-text">${esc(t.text)}</div></div>`).join('');}else secA.style.display='none';
   // B
   const secB=document.getElementById('ctxSecB'),brainEl=document.getElementById('ctxBrain');
-  if(aiText){secB.style.display='';brainEl.textContent=aiText;}else if(gk()){secB.style.display='';brainEl.innerHTML='<div class="ctx-brain-loading"><div class="g-sp"></div>분석 중...</div>';}else secB.style.display='none';
+  if(aiText){secB.style.display='';brainEl.classList.add('rv-ai');brainEl.innerHTML=aiText;}else if(gk()){secB.style.display='';brainEl.innerHTML='<div class="ctx-brain-loading"><div class="g-sp"></div>분석 중...</div>';}else secB.style.display='none';
   // C
   const batonCandidates=tasks.filter(t=>!t.done&&(t.category==='someday'||effectiveCategory(t)==='today')).slice(0,3);
   const secC=document.getElementById('ctxSecC'),batonList=document.getElementById('ctxBatonList');
@@ -1761,7 +1777,7 @@ async function checkDaily(){
     renderDailyModal(cached||null);
     renderTimeLogsInDaily(yTimeLogs);
     document.getElementById('ctxMo').classList.add('open');
-    if(!cached&&gk()){const allY=[...new Set([...createdY,...doneY])];if(allY.length){const s=await callDailySummaryAI(allY.map(t=>t.text));uSet(ck,s);document.getElementById('ctxBrain').textContent=s;}}
+    if(!cached&&gk()){const allY=[...new Set([...createdY,...doneY])];if(allY.length){const s=await callDailySummaryAI(allY.map(t=>t.text));uSet(ck,s);const el=document.getElementById('ctxBrain');el.classList.add('rv-ai');el.innerHTML=s;}}
   }catch(e){console.error('[checkDaily]',e);}
 }
 
@@ -1769,15 +1785,105 @@ async function openDailyManual(){
   try{const ck=dailyCacheKey();let cached=uGet(ck);renderDailyModal(cached||null);
     const yTimeLogs=await loadYesterdayTimeLogs();renderTimeLogsInDaily(yTimeLogs);
     document.getElementById('ctxMo').classList.add('open');
-    if(!cached&&gk()){const yDate=new Date(Date.now()-864e5),yStr=yDate.toDateString();const createdY=tasks.filter(t=>new Date(t.createdAt).toDateString()===yStr);const doneY=tasks.filter(t=>t.done&&t.doneAt&&new Date(t.doneAt).toDateString()===yStr);const allY=[...new Set([...createdY,...doneY])];if(allY.length){const s=await callDailySummaryAI(allY.map(t=>t.text));uSet(ck,s);document.getElementById('ctxBrain').textContent=s;}else document.getElementById('ctxSecB').style.display='none';}
+    if(!cached&&gk()){const yDate=new Date(Date.now()-864e5),yStr=yDate.toDateString();const createdY=tasks.filter(t=>new Date(t.createdAt).toDateString()===yStr);const doneY=tasks.filter(t=>t.done&&t.doneAt&&new Date(t.doneAt).toDateString()===yStr);const allY=[...new Set([...createdY,...doneY])];if(allY.length){const s=await callDailySummaryAI(allY.map(t=>t.text));uSet(ck,s);const el=document.getElementById('ctxBrain');el.classList.add('rv-ai');el.innerHTML=s;}else document.getElementById('ctxSecB').style.display='none';}
   }catch(e){console.error('[openDailyManual]',e);}
+}
+
+// 특정 날짜의 큰 목표별 done 블록 시간 합산 (AI 입력용 텍스트로 변환)
+async function getDayBlockSummary(targetDate){
+  const monday=monWk(targetDate);
+  const wid=getWeekId(monday);
+  let snap;
+  if(curWeekStart&&getWeekId(curWeekStart)===wid){snap=weekData;}
+  else{
+    const loaded=await loadWeekData(wid);
+    snap={blocks:(loaded&&loaded.blocks)||[]};
+    snap.blocks.forEach(migrateBlock);
+  }
+  const dy=targetDate.getDay(),dayIdx=dy===0?6:dy-1; // 월=0..일=6
+  const minutesByGoal={};let total=0;
+  (snap.blocks||[]).forEach(b=>{
+    if(b.day!==dayIdx)return;
+    if(b.status!=='done')return;
+    if(b.actualStart==null||b.actualEnd==null)return;
+    const min=Math.max(0,b.actualEnd-b.actualStart);
+    if(min<=0||!b.goalId)return;
+    minutesByGoal[b.goalId]=(minutesByGoal[b.goalId]||0)+min;
+    total+=min;
+  });
+  return formatGoalMinutes(minutesByGoal,total);
+}
+
+// 특정 주의 큰 목표별 done 블록 시간 합산 (AI 입력용)
+async function getWeekBlockSummary(monday){
+  const wid=getWeekId(monday);
+  let snap;
+  if(curWeekStart&&getWeekId(curWeekStart)===wid){snap=weekData;}
+  else{
+    const loaded=await loadWeekData(wid);
+    snap={blocks:(loaded&&loaded.blocks)||[]};
+    snap.blocks.forEach(migrateBlock);
+  }
+  const minutesByGoal={};let total=0;
+  (snap.blocks||[]).forEach(b=>{
+    if(b.status!=='done')return;
+    if(b.actualStart==null||b.actualEnd==null)return;
+    const min=Math.max(0,b.actualEnd-b.actualStart);
+    if(min<=0||!b.goalId)return;
+    minutesByGoal[b.goalId]=(minutesByGoal[b.goalId]||0)+min;
+    total+=min;
+  });
+  return formatGoalMinutes(minutesByGoal,total);
+}
+
+// 큰 목표별 분 합계를 AI 입력용 텍스트로 변환
+function formatGoalMinutes(minutesByGoal,total){
+  if(!total)return{lines:'(완료된 시간 블록 없음)',totalMin:0};
+  const userGoals=getUserGoals().filter(g=>(minutesByGoal[g.id]||0)>0).sort((a,b)=>(minutesByGoal[b.id]||0)-(minutesByGoal[a.id]||0));
+  const daily=getDailyGoal();
+  const ordered=[...userGoals];
+  if(daily&&(minutesByGoal[daily.id]||0)>0)ordered.push(daily);
+  const lines=ordered.map(g=>{
+    const m=minutesByGoal[g.id];
+    const pct=Math.round(m/total*100);
+    return`- ${g.title}: ${fmtHrMin(m)} (${pct}%)`;
+  }).join('\n');
+  return{lines,totalMin:total};
 }
 
 async function callDailySummaryAI(texts){
   if(!Array.isArray(texts)||!texts.length)return'요약할 데이터가 없어요.';
   const safe=texts.filter(t=>typeof t==='string'&&t.trim()).slice(0,15);
   if(!safe.length)return'요약할 데이터가 없어요.';
-  try{const res=await fetch('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${gk()}`},body:JSON.stringify({model:'gpt-4o-mini',messages:[{role:'system',content:'사용자가 어제 작성한 메모들이야. 핵심 맥락을 파악해서 딱 1줄 문장과 해시태그로 요약해. 평가나 조언은 절대 하지 마.'},{role:'user',content:safe.join('\n')}],temperature:0.4,max_tokens:100})});if(!res.ok)throw new Error('API '+res.status);const d=await res.json();return d.choices?.[0]?.message?.content?.trim()||'요약을 가져올 수 없었어요.';}catch(e){console.error('[callDailySummaryAI]',e);return'요약을 가져올 수 없었어요.';}
+  // 어제 시간 블록 데이터 추가
+  const yesterday=new Date(Date.now()-864e5);
+  const blockSummary=await getDayBlockSummary(yesterday);
+  const userInput=`[어제 작성/완료한 메모]
+${safe.map(t=>'- '+t).join('\n')}
+
+[어제 시간 블록 (큰 목표별, 실제 시간)]
+${blockSummary.lines}
+[총 ${fmtHrMin(blockSummary.totalMin)}]`;
+  const sysPrompt=`너는 ADHD 사용자의 일일 패턴을 데이터 기반으로 분석하는 코치야.
+주어진 어제 데이터(메모, 시간 블록 분배)로 짧은 HTML 레포트를 작성해.
+
+규칙:
+- HTML 태그만 사용: <h4>, <p>, <strong>, <em>, <ul>, <li>
+- 평가성 표현("잘했어요", "수고했어요", "대단해요") 절대 금지
+- 수치 인용 필수 (시간/퍼센트 구체적으로)
+- 직접적·분석적·코칭 톤
+- 큰 목표 명칭은 주어진 것만 그대로 사용 (추측해서 만들지 말 것)
+
+구조 (3블록):
+<h4>어제의 시간 분배</h4>
+<p>가장 시간을 쓴 큰 목표와 비율을 한 줄. 의미 있는 패턴이 있으면 짚기(예: "한 곳에 80% 쏠림", "일상 비중이 큼" 등).</p>
+<h4>관찰</h4>
+<p>메모와 시간 분배를 종합해 1~2문장 인사이트. 추측은 "...으로 보입니다" 톤.</p>
+<h4>오늘의 한 가지</h4>
+<p>어제 패턴을 토대로 오늘 시도해볼 구체적 행동 1개. 명령조 OK.</p>
+
+전체 8줄 이내, 마크다운 백틱 금지.`;
+  try{const res=await fetch('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${gk()}`},body:JSON.stringify({model:'gpt-4o-mini',messages:[{role:'system',content:sysPrompt},{role:'user',content:userInput}],temperature:0.4,max_tokens:400})});if(!res.ok)throw new Error('API '+res.status);const d=await res.json();return d.choices?.[0]?.message?.content?.trim()||'요약을 가져올 수 없었어요.';}catch(e){console.error('[callDailySummaryAI]',e);return'요약을 가져올 수 없었어요.';}
 }
 
 async function pickBaton(id){const t=tasks.find(x=>x.id===id);if(t&&t.category!=='today')await db.collection('tasks').doc(id).update({category:'today'});pinTask(id);closeCtx();showToast('📌 오늘의 초점 설정');}
@@ -1792,12 +1898,18 @@ async function autoDemoteOldTasks(){try{const todayISO=getTodayISO(),todayStart=
 /* ══════════════════════════════════════════════
    WEEKLY — 캐싱 + TimeLogs
    ══════════════════════════════════════════════ */
-function weeklyCacheKey(){return'weekly_summary_'+wkK(new Date());}
+function weeklyCacheKey(){return'weekly_summary_v2_'+wkK(new Date());}
 
 function renderWeeklyModal(aiText){
-  const mon=monWk(new Date()).toISOString();
+  const monday=monWk(new Date()),mon=monday.toISOString();
+  // 헤더의 주차 라벨
+  const wkLabel=document.getElementById('rvWeekLabel');
+  if(wkLabel){
+    const sun=new Date(monday);sun.setDate(sun.getDate()+6);
+    wkLabel.textContent=`${monday.getFullYear()}년 ${monday.getMonth()+1}/${monday.getDate()} – ${sun.getMonth()+1}/${sun.getDate()}`;
+  }
   const aiEl=document.getElementById('rvAiSummary');
-  if(aiText)aiEl.textContent=aiText;else if(gk())aiEl.innerHTML='<div class="ctx-brain-loading"><div class="g-sp"></div>분석 중...</div>';else aiEl.textContent='이번 주도 수고했어요.';
+  if(aiText){aiEl.classList.add('rv-ai');aiEl.innerHTML=aiText;}else if(gk())aiEl.innerHTML='<div class="ctx-brain-loading"><div class="g-sp"></div>분석 중...</div>';else aiEl.innerHTML='<p>이번 주는 데이터가 부족해요.</p>';
   const weekMemos=tasks.filter(t=>t.category==='memo'&&t.createdAt>=mon);
   const secB=document.getElementById('rvSecB');
   if(weekMemos.length){secB.style.display='';document.getElementById('rvMemoPreview').textContent=weekMemos.map(t=>'• '+t.text).join('\n');}else secB.style.display='none';
@@ -1879,26 +1991,65 @@ async function checkWeekly(){try{
   const ck=weeklyCacheKey();let cached=uGet(ck);renderWeeklyModal(cached||null);
   const wLogs=await loadWeekTimeLogs();renderTimeLogsInWeekly(wLogs);
   document.getElementById('rvMo').classList.add('open');
-  if(!cached&&gk()&&weekTasks.length){const s=await callWeeklySummaryAI(weekTasks);uSet(ck,s);document.getElementById('rvAiSummary').textContent=s;}
+  if(!cached&&gk()&&weekTasks.length){const s=await callWeeklySummaryAI(weekTasks);uSet(ck,s);const el=document.getElementById('rvAiSummary');el.classList.add('rv-ai');el.innerHTML=s;}
 }catch(e){console.error('[checkWeekly]',e);}}
 
 async function openWeeklyManual(){
   const ck=weeklyCacheKey();let cached=uGet(ck);renderWeeklyModal(cached||null);
   const wLogs=await loadWeekTimeLogs();renderTimeLogsInWeekly(wLogs);
   document.getElementById('rvMo').classList.add('open');
-  if(!cached&&gk()){const mon=monWk(new Date()).toISOString();const wt=tasks.filter(t=>t.createdAt>=mon||(t.doneAt&&t.doneAt>=mon));if(wt.length){const s=await callWeeklySummaryAI(wt);uSet(ck,s);document.getElementById('rvAiSummary').textContent=s;}else document.getElementById('rvAiSummary').textContent='이번 주 데이터가 없어요.';}
+  if(!cached&&gk()){const mon=monWk(new Date()).toISOString();const wt=tasks.filter(t=>t.createdAt>=mon||(t.doneAt&&t.doneAt>=mon));const s=await callWeeklySummaryAI(wt);if(wt.length||s)uSet(ck,s);const el=document.getElementById('rvAiSummary');el.classList.add('rv-ai');el.innerHTML=s||'<p>이번 주 데이터가 없어요.</p>';}
 }
 
 async function callWeeklySummaryAI(taskArray){
-  if(!Array.isArray(taskArray)||!taskArray.length)return'이번 주도 수고했어요.';
+  if(!Array.isArray(taskArray))taskArray=[];
   const safe=taskArray.filter(t=>t&&typeof t.text==='string'&&t.text.trim()).map(t=>({text:t.text.trim(),done:!!t.done}));
-  if(!safe.length)return'이번 주도 수고했어요.';
-  const done=safe.filter(t=>t.done).map(t=>t.text),rest=safe.filter(t=>!t.done).map(t=>t.text);
-  let structured='';
-  if(done.length)structured+='[이번 주 완료한 일]\n'+done.slice(0,15).map(t=>'- '+t).join('\n')+'\n\n';
-  if(rest.length)structured+='[이번 주 남긴 메모 및 계획]\n'+rest.slice(0,15).map(t=>'- '+t).join('\n');
-  if(!structured.trim())return'이번 주도 수고했어요.';
-  try{const res=await fetch('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${gk()}`},body:JSON.stringify({model:'gpt-4o-mini',messages:[{role:'system',content:'너는 사용자의 한 주를 객관적이고 담백하게 요약하는 비서야. [이번 주 완료한 일]을 중심으로 성취를 1~2개 짚어줘. [남긴 메모 및 계획]은 관심 테마 파악용. 과도한 감탄사 없이 2~3문장 이내.'},{role:'user',content:structured}],temperature:0.4,max_tokens:250})});if(!res.ok)throw new Error();const d=await res.json();return d.choices?.[0]?.message?.content?.trim()||'이번 주도 수고했어요.';}catch(e){console.error('[callWeeklySummaryAI]',e);return'이번 주도 수고했어요.';}
+  const done=safe.filter(t=>t.done).map(t=>t.text);
+  const rest=safe.filter(t=>!t.done).map(t=>t.text);
+  // 이번 주 시간 블록 + 큰 목표 데이터
+  const monday=monWk(new Date());
+  const blockSummary=await getWeekBlockSummary(monday);
+  const goalList=getUserGoals().map(g=>'- '+g.title).join('\n')||'(사용자 정의 큰 목표 없음 — 일상만)';
+  // 데이터 없으면 짧게 폴백
+  if(!safe.length&&blockSummary.totalMin===0)return'<p>이번 주는 기록된 데이터가 없어요. 다음 주는 메모 한 줄, 시간 블록 한 개라도 남겨보세요.</p>';
+  const userInput=`[큰 목표 리스트]
+${goalList}
+
+[이번 주 시간 블록 (큰 목표별, done 블록 실제 시간)]
+${blockSummary.lines}
+[총 ${fmtHrMin(blockSummary.totalMin)}]
+
+[이번 주 완료한 메모/할 일]
+${done.length?done.slice(0,15).map(t=>'- '+t).join('\n'):'(없음)'}
+
+[이번 주 남긴 메모/계획]
+${rest.length?rest.slice(0,15).map(t=>'- '+t).join('\n'):'(없음)'}`;
+  const sysPrompt=`너는 ADHD 사용자의 한 주를 데이터 기반으로 분석하는 코치야.
+주어진 데이터(큰 목표 리스트, 큰 목표별 시간 분배, 완료한 일, 남긴 메모)로 HTML 레포트를 작성해.
+
+규칙:
+- HTML 태그만 사용: <h4>, <p>, <strong>, <em>, <ul>, <li>
+- 평가성 표현 절대 금지: "잘했어요", "수고했어요", "대단해요", "훌륭해요", "최고예요"
+- 수치 인용 필수 (시간/퍼센트 구체적으로)
+- 직접적·분석적·코칭 톤
+- 큰 목표 명칭은 주어진 것만 그대로 사용 (추측해서 만들지 말 것)
+- 빈 데이터(예: 메모 없음)는 무시하고 있는 것만 분석
+
+구조 (4섹션 고정):
+<h4>핵심 성취</h4>
+<ul><li>구체적 성취 1~2개. 완료한 메모와 큰 목표 시간 분배에서 추출.</li></ul>
+
+<h4>큰 목표별 분석</h4>
+<p>가장 시간을 쓴 큰 목표 1~2개를 짚고, 균형을 한 줄로 평가. "WorldQuant IQC 통과에 12h(40%)로 가장 큰 비중을 두고 있습니다." 같은 톤.</p>
+
+<h4>관찰된 패턴</h4>
+<p>시간 분배에서 보이는 경향. 예: "한 목표에 60% 이상 쏠렸습니다", "일상이 50%를 차지해 큰 목표 시간이 부족해 보입니다", "큰 목표 X에는 시간이 거의 없습니다".</p>
+
+<h4>다음 주 제안</h4>
+<p>구체적 행동 1~2개. 명령조 OK. 예: "큰 목표 X에 최소 N시간 블록을 잡으세요".</p>
+
+전체 14줄 이내, 마크다운 백틱 금지.`;
+  try{const res=await fetch('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${gk()}`},body:JSON.stringify({model:'gpt-4o-mini',messages:[{role:'system',content:sysPrompt},{role:'user',content:userInput}],temperature:0.4,max_tokens:700})});if(!res.ok)throw new Error();const d=await res.json();return d.choices?.[0]?.message?.content?.trim()||'<p>요약을 가져올 수 없었어요.</p>';}catch(e){console.error('[callWeeklySummaryAI]',e);return'<p>요약을 가져올 수 없었어요.</p>';}
 }
 
 async function shareWeeklyMemos(){const mon=monWk(new Date()).toISOString();const memos=tasks.filter(t=>t.category==='memo'&&t.createdAt>=mon);if(!memos.length){showToast('공유할 메모 없음');return;}const text='🧠 이번 주 Brain Dump 메모\n\n'+memos.map(t=>'• '+t.text).join('\n');if(navigator.share){try{await navigator.share({title:'이번 주 메모',text});}catch(e){if(e.name!=='AbortError')showToast('공유 실패');}}else{try{await navigator.clipboard.writeText(text);showToast('클립보드에 복사됨');}catch{showToast('복사 실패');}}}
