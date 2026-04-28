@@ -1073,8 +1073,26 @@ function bindWeekDnD(container){
   });
 }
 
+const NEW_BLOCK_PLACEHOLDERS=[
+  '오늘 목표랑 맞는 일인지 잠깐 체크',
+  '이거 진짜 지금 해야 하는 거 맞아요?',
+  '독서? 운동? 다만 목표 확인은 필수!',
+  'SNS 말고 진짜 할 일로요',
+  '30분짜리 가벼운 거라도 OK',
+  '큰 일 말고 작은 거부터',
+  '한 줄이면 충분해요',
+  '완벽하지 않아도 일단 적기',
+  '잠깐, 뭐였더라...',
+  '방금 뭐 하려고 했지?',
+  '어... 뭐 적으려 했지?',
+  '지금 떠오른 거 그대로',
+  '딴 거 말고 지금 진짜 할 거',
+  '어차피 30분 후에 뭐 할지 까먹어요'
+];
 function openNewBlockMo(day,row){
-  document.getElementById('wpNewTitle').value='';
+  const titleIn=document.getElementById('wpNewTitle');
+  titleIn.value='';
+  titleIn.placeholder=NEW_BLOCK_PLACEHOLDERS[Math.floor(Math.random()*NEW_BLOCK_PLACEHOLDERS.length)];
   document.getElementById('wpNewStart').value=fmtMin(row*30);
   document.getElementById('wpNewEnd').value=fmtMin(Math.min(row*30+60,1440));
   // 요일 selector
