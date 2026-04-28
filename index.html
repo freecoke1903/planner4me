@@ -512,7 +512,7 @@ body.view-week.mode-popup .p-week{display:flex;}
   <div class="mo-d" style="margin-bottom:14px">어제의 흐름을 이어받아요.</div>
   <div class="ctx-section" id="ctxSecA" style="display:none"><div class="ctx-sec-title">🎉 어제 해낸 일</div><div class="ctx-done-list" id="ctxDoneList"></div></div>
   <div class="ctx-section" id="ctxSecTime" style="display:none"><div class="ctx-sec-title">⏱️ 어제의 몰입</div><div id="ctxTimeList"></div></div>
-  <div class="ctx-section" id="ctxSecB" style="display:none"><div class="ctx-sec-title">🧠 어제의 뇌구조</div><div class="ctx-brain" id="ctxBrain"><div class="ctx-brain-loading"><div class="g-sp"></div>분석 중...</div></div></div>
+  <div class="ctx-section" id="ctxSecB" style="display:none"><div class="ctx-sec-title">🪞 어제의 거울</div><div class="ctx-brain" id="ctxBrain"><div class="ctx-brain-loading"><div class="g-sp"></div>분석 중...</div></div></div>
   <div class="ctx-section" id="ctxSecC" style="display:none"><div class="ctx-sec-title">📌 오늘의 과제 설정</div><div class="ctx-baton-list" id="ctxBatonList"></div></div>
   <button class="ctx-skip" onclick="closeCtx()">그냥 시작할게요</button>
 </div></div>
@@ -1763,7 +1763,7 @@ function toggleArchDd(id,evt){if(evt)evt.stopPropagation();document.querySelecto
 /* ══════════════════════════════════════════════
    DAILY — 캐싱 + 수동 열기 + TimeLogs
    ══════════════════════════════════════════════ */
-function dailyCacheKey(){return 'daily_summary_v2_'+getTodayISO().replace(/-/g,'');}
+function dailyCacheKey(){return 'daily_summary_v3_'+getTodayISO().replace(/-/g,'');}
 
 function renderDailyModal(aiText){
   const yDate=new Date(Date.now()-864e5),yStr=yDate.toDateString();
@@ -2301,38 +2301,38 @@ ${undoneSamples}`;
 
 
 async function callDailySummaryAI(texts){
-  if(!Array.isArray(texts)||!texts.length)return'요약할 데이터가 없어요.';
-  const safe=texts.filter(t=>typeof t==='string'&&t.trim()).slice(0,15);
-  if(!safe.length)return'요약할 데이터가 없어요.';
-  // 어제 시간 블록 데이터 추가
+  // v16 Step 6: 거울 역할만 — 짧고 담백한 1~2문장
+  const safe=(Array.isArray(texts)?texts:[]).filter(t=>typeof t==='string'&&t.trim()).slice(0,15);
   const yesterday=new Date(Date.now()-864e5);
   const blockSummary=await getDayBlockSummary(yesterday);
-  const userInput=`[어제 작성/완료한 메모]
-${safe.map(t=>'- '+t).join('\n')}
-
-[어제 시간 블록 (큰 목표별, 실제 시간)]
+  if(!safe.length&&blockSummary.totalMin===0){
+    return'<p class="rv-placeholder">어제 데이터가 없어요. 메모 한 줄이나 시간 블록 한 개라도 남겨보세요.</p>';
+  }
+  const userInput=`[어제 시간 블록 (큰 목표별, 실제 시간)]
 ${blockSummary.lines}
-[총 ${fmtHrMin(blockSummary.totalMin)}]`;
-  const sysPrompt=`너는 ADHD 사용자의 일일 패턴을 데이터 기반으로 분석하는 코치야.
-주어진 어제 데이터(메모, 시간 블록 분배)로 짧은 HTML 레포트를 작성해.
+[총 ${fmtHrMin(blockSummary.totalMin)}]
 
-규칙:
-- HTML 태그만 사용: <h4>, <p>, <strong>, <em>, <ul>, <li>
-- 평가성 표현("잘했어요", "수고했어요", "대단해요") 절대 금지
-- 수치 인용 필수 (시간/퍼센트 구체적으로)
-- 직접적·분석적·코칭 톤
-- 큰 목표 명칭은 주어진 것만 그대로 사용 (추측해서 만들지 말 것)
+[어제 작성/완료한 메모]
+${safe.length?safe.map(t=>'- '+t).join('\n'):'(없음)'}`;
+  const sys=RV_AI_COMMON_RULES+`
+너는 사용자의 어제 데이터를 보고 본인이 무의식적으로 한 행동의 패턴을 짚는 거울이야.
+일일 회고는 매일 보는 거라 짧게 — 거울 역할만.
 
-구조 (3블록):
-<h4>어제의 시간 분배</h4>
-<p>가장 시간을 쓴 큰 목표와 비율을 한 줄. 의미 있는 패턴이 있으면 짚기(예: "한 곳에 80% 쏠림", "일상 비중이 큼" 등).</p>
-<h4>관찰</h4>
-<p>메모와 시간 분배를 종합해 1~2문장 인사이트. 추측은 "...으로 보입니다" 톤.</p>
-<h4>오늘의 한 가지</h4>
-<p>어제 패턴을 토대로 오늘 시도해볼 구체적 행동 1개. 명령조 OK.</p>
+목표:
+- 어제 시간 블록 분배 / 메모 중 1개 차원에서
+- 사용자가 평소 의식 못한 행동 경향을 짚기
 
-전체 8줄 이내, 마크다운 백틱 금지.`;
-  try{const res=await fetch('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${gk()}`},body:JSON.stringify({model:'gpt-4o-mini',messages:[{role:'system',content:sysPrompt},{role:'user',content:userInput}],temperature:0.4,max_tokens:400})});if(!res.ok)throw new Error('API '+res.status);const d=await res.json();return d.choices?.[0]?.message?.content?.trim()||'요약을 가져올 수 없었어요.';}catch(e){console.error('[callDailySummaryAI]',e);return'요약을 가져올 수 없었어요.';}
+출력 톤:
+- 사실 보고 또는 추세 둘 다 OK
+- 추세 표현 사용 시 한 응답에 1번 이내
+
+출력 형식: HTML <p> 1~2문장. 매우 짧게. <strong> / <em> 강조 OK.
+
+좋은 예:
+<p>어제 WorldQuant IQC 통과에 <strong>3시간 (60%)</strong>. 단일 큰 목표 집중 패턴.</p>
+<p>일상 비중 <strong>80%</strong>. 휴식이 주된 흐름으로 보입니다.</p>
+<p>어제 메모 4개 모두 <em>이메일</em> 키워드 — 이메일 정리 보류 중으로 추정.</p>`;
+  return callRvAI(sys,userInput,200);
 }
 
 async function pickBaton(id){const t=tasks.find(x=>x.id===id);if(t&&t.category!=='today')await db.collection('tasks').doc(id).update({category:'today'});pinTask(id);closeCtx();showToast('📌 오늘의 초점 설정');}
