@@ -39,6 +39,21 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Helvetica Neue'
 .g-sp{width:16px;height:16px;border:2px solid var(--sep);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg)}}
 
+/* ══════ ONBOARDING OVERLAYS (manual / welcome) ══════ */
+.ob-ov{position:fixed;inset:0;z-index:9998;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;transition:opacity .35s,visibility .35s;}
+.ob-ov.hidden{opacity:0;visibility:hidden;pointer-events:none;}
+.ob-content{max-width:440px;width:100%;}
+.ob-placeholder{padding:36px 28px;background:var(--surface);border-radius:20px;box-shadow:var(--shL);text-align:center;display:flex;flex-direction:column;gap:14px;align-items:center;}
+.ob-emoji{font-size:56px;line-height:1;}
+.ob-placeholder h2{font-size:22px;font-weight:700;letter-spacing:-.3px;color:var(--label);}
+.ob-placeholder p{font-size:14px;color:var(--sec);line-height:1.55;}
+.ob-acts{display:flex;gap:10px;margin-top:8px;width:100%;justify-content:center;}
+.ob-btn-pri,.ob-btn-sec{font-family:inherit;font-size:14px;font-weight:600;padding:11px 22px;border-radius:12px;border:none;cursor:pointer;transition:all .15s;}
+.ob-btn-pri{background:var(--blue);color:#fff;}
+.ob-btn-pri:hover{filter:brightness(1.05);}
+.ob-btn-sec{background:var(--grp);color:var(--sec);}
+.ob-btn-sec:hover{background:var(--gray);color:var(--label);}
+
 /* ══════ VIEW A: POPUP ══════ */
 .view-popup{display:none;height:100%;height:100dvh;flex-direction:column;}
 body.mode-popup .view-popup{display:flex;}
@@ -427,12 +442,42 @@ body.view-week.mode-popup .p-week{display:flex;}
 </head>
 <body>
 
-<!-- ══════ LOGIN ══════ -->
+<!-- ══════ LANDING (=loginOv, Phase 2에서 디자인 채움) ══════ -->
 <div class="login-ov" id="loginOv">
   <div class="logo">🧠</div><h1>Brain Dump</h1>
   <p>머릿속을 비우세요. AI가 정리해줄게요.</p>
   <button class="g-btn" id="loginBtn" onclick="doLogin()"><svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59a14.5 14.5 0 0 1 0-9.18l-7.98-6.19a24 24 0 0 0 0 21.56l7.98-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>Google로 시작</button>
   <div class="g-ld" id="loginLd"><div class="g-sp"></div>로그인 중...</div>
+</div>
+
+<!-- ══════ ONBOARDING: MANUAL (Phase 3에서 슬라이드 디자인) ══════ -->
+<div class="ob-ov hidden" id="manualOv">
+  <div class="ob-content">
+    <div class="ob-placeholder">
+      <div class="ob-emoji">📖</div>
+      <h2>미니 매뉴얼 (placeholder)</h2>
+      <p>Phase 3에서 3슬라이드 + 인디케이터로 채울 예정.</p>
+      <div class="ob-acts">
+        <button class="ob-btn-sec" onclick="showWelcome()">건너뛰기</button>
+        <button class="ob-btn-pri" onclick="showWelcome()">다음 →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ ONBOARDING: WELCOME (Phase 4에서 디자인) ══════ -->
+<div class="ob-ov hidden" id="welcomeOv">
+  <div class="ob-content">
+    <div class="ob-placeholder">
+      <div class="ob-emoji">☀️</div>
+      <h2>환영합니다 (placeholder)</h2>
+      <p>Phase 4에서 입력창 + 첫 카드 자동 등록 추가.</p>
+      <div class="ob-acts">
+        <button class="ob-btn-sec" onclick="finishOnboarding()">일단 둘러볼게요</button>
+        <button class="ob-btn-pri" onclick="finishOnboarding()">시작하기</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- ══════ VIEW A: POPUP ══════ -->
@@ -1635,12 +1680,73 @@ function gk(){return uGet('openai_key')||'';}
    ══════════════════════════════════════════════ */
 function setFilter(f){curFilter=f;document.querySelectorAll('.p-tab').forEach(t=>t.classList.toggle('active',t.dataset.filter===f));renderPFeed();}
 
-if(PREVIEW_BYPASS){document.getElementById('loginOv').classList.add('hidden');document.getElementById(IS_POPUP?'viewPopup':'viewDash').style.display='flex';loadBigGoalsListen();}
-auth.onAuthStateChanged(u=>{if(PREVIEW_BYPASS)return;if(u){CU=u;showApp();startListen();loadBigGoalsListen();}else{CU=null;hideApp();if(unsub)unsub();if(_bigGoalsUnsub){_bigGoalsUnsub();_bigGoalsUnsub=null;}bigGoals=[];}});
+/* ══════════════════════════════════════════════
+   ONBOARDING ROUTING (v17 Phase 1)
+   ══════════════════════════════════════════════ */
+const ONBOARDED_KEY='planner4me_onboarded';
+const ONBOARDED_AT_KEY='planner4me_onboardedAt';
+const GOAL_HINT_KEY='planner4me_goalHintDismissed';
+function isOnboarded(){return localStorage.getItem(ONBOARDED_KEY)==='true';}
+function markOnboarded(){
+  localStorage.setItem(ONBOARDED_KEY,'true');
+  if(!localStorage.getItem(ONBOARDED_AT_KEY))localStorage.setItem(ONBOARDED_AT_KEY,new Date().toISOString());
+}
+function getOnboardedAt(){const v=localStorage.getItem(ONBOARDED_AT_KEY);return v?new Date(v):null;}
+
+let _manualReplayMode=false; // 설정에서 매뉴얼 재시청 시 true (onboarded 변경 X)
+
+function hideAllOnboarding(){
+  document.getElementById('loginOv').classList.add('hidden');
+  document.getElementById('manualOv').classList.add('hidden');
+  document.getElementById('welcomeOv').classList.add('hidden');
+}
+function hideAppOnly(){
+  document.getElementById('viewPopup').style.display='none';
+  document.getElementById('viewDash').style.display='none';
+}
+function showLanding(){hideAllOnboarding();hideAppOnly();document.getElementById('loginOv').classList.remove('hidden');}
+function showManual(replay){
+  _manualReplayMode=!!replay;
+  hideAllOnboarding();hideAppOnly();
+  document.getElementById('manualOv').classList.remove('hidden');
+}
+function showWelcome(){
+  // 매뉴얼 재시청 모드면 웰컴 건너뛰고 바로 앱
+  if(_manualReplayMode){_manualReplayMode=false;showApp();return;}
+  hideAllOnboarding();hideAppOnly();
+  document.getElementById('welcomeOv').classList.remove('hidden');
+}
+function finishOnboarding(){
+  markOnboarded();
+  showApp();
+}
+function showManualReplay(){showManual(true);}
+
+if(PREVIEW_BYPASS){
+  // 미리보기/시연 모드 — onboarding 스킵하고 바로 앱
+  showApp();
+  loadBigGoalsListen();
+}
+auth.onAuthStateChanged(u=>{
+  if(PREVIEW_BYPASS)return;
+  if(u){
+    CU=u;
+    startListen();
+    loadBigGoalsListen();
+    if(!isOnboarded())showManual();
+    else showApp();
+  }else{
+    CU=null;
+    if(unsub)unsub();
+    if(_bigGoalsUnsub){_bigGoalsUnsub();_bigGoalsUnsub=null;}
+    bigGoals=[];
+    showLanding();
+  }
+});
 async function doLogin(){const b=document.getElementById('loginBtn'),l=document.getElementById('loginLd');b.disabled=true;l.classList.add('show');try{await auth.signInWithPopup(gP);}catch(e){showToast(e.code==='auth/popup-closed-by-user'?'취소됨':'로그인 실패');}b.disabled=false;l.classList.remove('show');}
 async function doLogout(){closeSet();await auth.signOut();tasks=[];pinnedId=null;showToast('로그아웃');}
-function showApp(){document.getElementById('loginOv').classList.add('hidden');(IS_POPUP?document.getElementById('viewPopup'):document.getElementById('viewDash')).style.display='flex';}
-function hideApp(){document.getElementById('loginOv').classList.remove('hidden');document.getElementById('viewPopup').style.display='none';document.getElementById('viewDash').style.display='none';}
+function showApp(){hideAllOnboarding();(IS_POPUP?document.getElementById('viewPopup'):document.getElementById('viewDash')).style.display='flex';}
+function hideApp(){hideAppOnly();document.getElementById('loginOv').classList.remove('hidden');}
 
 /* ══════════════════════════════════════════════
    FIRESTORE onSnapshot
