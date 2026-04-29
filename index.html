@@ -256,6 +256,11 @@ body.mode-dash .view-popup{display:none!important;}
 .set-nm{font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .set-em{font-size:11px;color:var(--sec);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .lo-btn{width:100%;padding:10px;border:none;border-radius:10px;background:var(--grp);font-family:inherit;font-size:13px;font-weight:500;color:var(--red);cursor:pointer;text-align:center;}
+.set-link{width:100%;padding:10px;border:none;border-radius:10px;background:var(--grp);font-family:inherit;font-size:13px;font-weight:500;color:var(--blue);cursor:pointer;text-align:center;transition:background .15s;}
+.set-link:hover{background:var(--gray);}
+.goal-hint{display:flex;align-items:center;gap:8px;margin-top:10px;margin-bottom:8px;padding:9px 12px;background:#FFFBEA;border:1px solid #FCD34D;border-radius:10px;font-size:12px;color:#78350F;font-weight:500;line-height:1.4;}
+.goal-hint-x{margin-left:auto;background:none;border:none;font-size:16px;cursor:pointer;color:#78350F;line-height:1;padding:2px 6px;border-radius:4px;flex-shrink:0;}
+.goal-hint-x:hover{background:rgba(120,53,15,.12);}
 
 /* Context modal sections */
 .ctx-section{margin-bottom:16px;}.ctx-section:last-child{margin-bottom:0;}
@@ -647,7 +652,7 @@ body.view-week.mode-popup .p-week{display:flex;}
 <!-- ══════ MODALS ══════ -->
 
 <!-- Settings -->
-<div class="mo" id="setMo"><div class="mo-box"><div class="mo-t">설정</div><div class="mo-d">AI 분류용 OpenAI API 키</div><label class="mo-lb">API Key</label><input class="mo-in" id="apiIn" type="password" placeholder="sk-proj-..." autocomplete="off" spellcheck="false"><div class="mo-st" id="keySt"></div><div class="mo-acts"><button class="mo-btn dan" id="keyDel" onclick="delKey()" style="margin-right:auto;display:none">삭제</button><button class="mo-btn sec" onclick="closeSet()">취소</button><button class="mo-btn pri" onclick="saveKey()">저장</button></div><div class="set-div"></div><div class="set-acct" id="setAcct"></div><button class="lo-btn" onclick="doLogout()">로그아웃</button></div></div>
+<div class="mo" id="setMo"><div class="mo-box"><div class="mo-t">설정</div><div class="mo-d">AI 분류용 OpenAI API 키</div><label class="mo-lb">API Key</label><input class="mo-in" id="apiIn" type="password" placeholder="sk-proj-..." autocomplete="off" spellcheck="false"><div class="mo-st" id="keySt"></div><div class="mo-acts"><button class="mo-btn dan" id="keyDel" onclick="delKey()" style="margin-right:auto;display:none">삭제</button><button class="mo-btn sec" onclick="closeSet()">취소</button><button class="mo-btn pri" onclick="saveKey()">저장</button></div><div class="set-div"></div><button class="set-link" onclick="closeSet();showManualReplay()">🔄 튜토리얼 다시 보기</button><div class="set-div"></div><div class="set-acct" id="setAcct"></div><button class="lo-btn" onclick="doLogout()">로그아웃</button></div></div>
 
 <!-- Archive -->
 <div class="mo" id="archMo"><div class="mo-box" style="max-width:400px"><div class="mo-t">📦 보관함</div><div class="mo-d">보관된 항목들이에요.</div><div class="arch-list" id="archList"></div><div class="mo-acts"><button class="mo-btn sec" onclick="closeArchive()" style="width:100%;text-align:center">닫기</button></div></div></div>
@@ -1724,17 +1729,19 @@ async function startNewBigGoalFlow(){
 }
 
 function renderBigGoals(){
+  const hintHTML=shouldShowGoalHint()?`<div class="goal-hint">💡 큰 목표 1개 정해보세요<button class="goal-hint-x" onclick="dismissGoalHint()" title="닫기">×</button></div>`:'';
   document.querySelectorAll('.bg-goals-mount').forEach(mount=>{
     // "일상"이 항상 마지막에 오도록 정렬: 사용자 정의 → 일상
     const userGoals=getUserGoals();
     const daily=getDailyGoal();
     const ordered=daily?[...userGoals,daily]:userGoals;
     if(!ordered.length){
-      mount.innerHTML=`<div class="bg-goals-title">🎯 이번 분기 큰 목표</div><div class="bg-goals-empty">분기/연 단위 큰 목표를 정하면 시간 분배가 보여요.</div><button class="bg-goal-add" onclick="startNewBigGoalFlow()">+ 큰 목표 추가</button>`;
+      mount.innerHTML=`<div class="bg-goals-title">🎯 이번 분기 큰 목표</div><div class="bg-goals-empty">분기/연 단위 큰 목표를 정하면 시간 분배가 보여요.</div>${hintHTML}<button class="bg-goal-add" onclick="startNewBigGoalFlow()">+ 큰 목표 추가</button>`;
       return;
     }
     let h=`<div class="bg-goals-title">🎯 이번 분기 큰 목표</div>`;
     h+=ordered.map(g=>`<div class="bg-goal-item${g.done?' done':''}" data-bg-id="${g.id}" onclick="onBigGoalClick('${g.id}')" ondblclick="onBigGoalDblClick('${g.id}',event)" title="클릭: 수정 / 더블클릭: 완료 토글"><span class="bg-goal-dot" style="background:${g.color}"></span><span class="bg-goal-title">${esc(g.title)}</span></div>`).join('');
+    h+=hintHTML;
     h+=`<button class="bg-goal-add" onclick="startNewBigGoalFlow()">+ 큰 목표 추가</button>`;
     mount.innerHTML=h;
   });
@@ -1793,6 +1800,21 @@ function markOnboarded(){
   if(!localStorage.getItem(ONBOARDED_AT_KEY))localStorage.setItem(ONBOARDED_AT_KEY,new Date().toISOString());
 }
 function getOnboardedAt(){const v=localStorage.getItem(ONBOARDED_AT_KEY);return v?new Date(v):null;}
+
+// 큰 목표 안내 풍선: 온보딩 7일 안 + 사용자 정의 큰 목표 0개 + 미닫힘일 때만 표시
+function shouldShowGoalHint(){
+  if(PREVIEW_BYPASS)return false;
+  if(localStorage.getItem(GOAL_HINT_KEY)==='true')return false;
+  const at=getOnboardedAt();if(!at)return false;
+  const days=(Date.now()-at.getTime())/86400000;
+  if(days>7)return false;
+  if(getUserGoals().length>0)return false;
+  return true;
+}
+function dismissGoalHint(){
+  localStorage.setItem(GOAL_HINT_KEY,'true');
+  document.querySelectorAll('.goal-hint').forEach(e=>e.remove());
+}
 
 let _manualReplayMode=false; // 설정에서 매뉴얼 재시청 시 true (onboarded 변경 X)
 
