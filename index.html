@@ -77,6 +77,22 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Helvetica Neue'
 .ob-btn-pri:hover{filter:brightness(1.05);}
 .ob-btn-sec{background:var(--grp);color:var(--sec);}
 .ob-btn-sec:hover{background:var(--gray);color:var(--label);}
+.manual-card{padding:36px 28px 24px;background:var(--surface);border-radius:20px;box-shadow:var(--shL);text-align:center;}
+.manual-slides{position:relative;min-height:240px;margin-bottom:20px;}
+.manual-slide{display:none;animation:slideIn .35s ease;}
+.manual-slide.active{display:block;}
+@keyframes slideIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
+.manual-h{font-size:22px;font-weight:700;letter-spacing:-.3px;margin:18px 0 14px;color:var(--label);}
+.manual-desc{font-size:14.5px;line-height:1.65;color:var(--label);margin-bottom:14px;font-weight:500;}
+.manual-detail{font-size:13px;color:var(--sec);line-height:1.6;}
+.manual-dots{display:flex;justify-content:center;gap:8px;margin-bottom:22px;}
+.manual-dot{width:8px;height:8px;border-radius:50%;background:var(--sep);cursor:pointer;transition:all .25s;}
+.manual-dot.active{width:24px;background:var(--blue);border-radius:4px;}
+.manual-actions{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;}
+@media(min-width:480px){
+  .manual-card{padding:44px 32px 28px;}
+  .manual-h{font-size:24px;}
+}
 
 /* ══════ VIEW A: POPUP ══════ */
 .view-popup{display:none;height:100%;height:100dvh;flex-direction:column;}
@@ -506,17 +522,36 @@ body.view-week.mode-popup .p-week{display:flex;}
   </div>
 </div>
 
-<!-- ══════ ONBOARDING: MANUAL (Phase 3에서 슬라이드 디자인) ══════ -->
+<!-- ══════ ONBOARDING: MANUAL (3슬라이드) ══════ -->
 <div class="ob-ov hidden" id="manualOv">
   <div class="ob-content">
-    <div class="ob-placeholder">
-      <div class="ob-emoji">📖</div>
-      <h2>미니 매뉴얼 (placeholder)</h2>
-      <p>Phase 3에서 3슬라이드 + 인디케이터로 채울 예정.</p>
-      <div class="ob-acts">
-        <button class="ob-btn-sec" onclick="showWelcome()">건너뛰기</button>
-        <button class="ob-btn-pri" onclick="showWelcome()">다음 →</button>
+    <div class="manual-card">
+      <div class="manual-slides" id="manualSlides">
+        <div class="manual-slide active">
+          <div class="ob-emoji">✏️</div>
+          <h2 class="manual-h">머릿속 비우기</h2>
+          <p class="manual-desc">떠오르는 거 아무거나 한 줄 적으세요.<br>대충 적어도 OK. AI가 알아서 분류해줍니다.</p>
+          <p class="manual-detail">오늘 / 예정 / 언젠가 / 메모 — 4가지로.</p>
+        </div>
+        <div class="manual-slide">
+          <div class="ob-emoji">🎯</div>
+          <h2 class="manual-h">큰 그림과 시간</h2>
+          <p class="manual-desc">이번 분기 큰 목표 1-3개를 정하고,<br>시간 블록으로 실행을 가시화하세요.</p>
+          <p class="manual-detail">24시간 그리드에 흘러간 시간이 보입니다.</p>
+        </div>
+        <div class="manual-slide">
+          <div class="ob-emoji">🪞</div>
+          <h2 class="manual-h">거울로 만나는 나</h2>
+          <p class="manual-desc">매주 일요일, AI가 한 주를 비춰줍니다.<br>의식 못 한 패턴, 변화, 연결.</p>
+          <p class="manual-detail">평가하지 않고, 그냥 비춥니다.</p>
+        </div>
       </div>
+      <div class="manual-dots" id="manualDots">
+        <span class="manual-dot active" onclick="manualGo(0)"></span>
+        <span class="manual-dot" onclick="manualGo(1)"></span>
+        <span class="manual-dot" onclick="manualGo(2)"></span>
+      </div>
+      <div class="manual-actions" id="manualActions"></div>
     </div>
   </div>
 </div>
@@ -1761,11 +1796,30 @@ function hideAppOnly(){
   document.getElementById('viewDash').style.display='none';
 }
 function showLanding(){hideAllOnboarding();hideAppOnly();document.getElementById('loginOv').classList.remove('hidden');}
+let _manualIdx=0;
 function showManual(replay){
   _manualReplayMode=!!replay;
   hideAllOnboarding();hideAppOnly();
+  _manualIdx=0;
+  renderManualSlide();
   document.getElementById('manualOv').classList.remove('hidden');
 }
+function renderManualSlide(){
+  document.querySelectorAll('.manual-slide').forEach((s,i)=>s.classList.toggle('active',i===_manualIdx));
+  document.querySelectorAll('.manual-dot').forEach((d,i)=>d.classList.toggle('active',i===_manualIdx));
+  const acts=document.getElementById('manualActions');if(!acts)return;
+  if(_manualIdx===0){
+    acts.innerHTML=`<button class="ob-btn-sec" onclick="manualSkip()">건너뛰기</button><button class="ob-btn-pri" onclick="manualNext()">다음 →</button>`;
+  }else if(_manualIdx===1){
+    acts.innerHTML=`<button class="ob-btn-sec" onclick="manualSkip()">건너뛰기</button><button class="ob-btn-sec" onclick="manualPrev()">← 이전</button><button class="ob-btn-pri" onclick="manualNext()">다음 →</button>`;
+  }else{
+    acts.innerHTML=`<button class="ob-btn-sec" onclick="manualPrev()">← 이전</button><button class="ob-btn-pri" onclick="manualNext()">시작하기</button>`;
+  }
+}
+function manualNext(){if(_manualIdx<2){_manualIdx++;renderManualSlide();}else showWelcome();}
+function manualPrev(){if(_manualIdx>0){_manualIdx--;renderManualSlide();}}
+function manualSkip(){showWelcome();}
+function manualGo(i){if(i<0||i>2)return;_manualIdx=i;renderManualSlide();}
 function showWelcome(){
   // 매뉴얼 재시청 모드면 웰컴 건너뛰고 바로 앱
   if(_manualReplayMode){_manualReplayMode=false;showApp();return;}
@@ -2866,6 +2920,18 @@ function showToast(m){const t=document.getElementById('toast');t.textContent=m;t
    ══════════════════════════════════════════════ */
 if(IS_POPUP){const ta=document.getElementById('pTa');ta.addEventListener('input',function(){this.style.height='auto';this.style.height=Math.min(this.scrollHeight,100)+'px';});ta.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();handleDump();}});}
 if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('./sw.js').catch(()=>{});});}
+
+// 매뉴얼 슬라이드 좌우 스와이프
+(()=>{
+  const slides=document.getElementById('manualSlides');if(!slides)return;
+  let sx=0,sy=0;
+  slides.addEventListener('touchstart',e=>{sx=e.touches[0].clientX;sy=e.touches[0].clientY;},{passive:true});
+  slides.addEventListener('touchend',e=>{
+    const dx=e.changedTouches[0].clientX-sx,dy=e.changedTouches[0].clientY-sy;
+    if(Math.abs(dx)<40||Math.abs(dy)>Math.abs(dx))return; // 가로 임계 + 세로 우세시 무시
+    if(dx<0)manualNext();else manualPrev();
+  },{passive:true});
+})();
 </script>
 </body>
 </html>
