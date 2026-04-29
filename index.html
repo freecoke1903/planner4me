@@ -97,6 +97,7 @@ body.mode-popup .view-dash{display:none!important;}
 
 /* Dropdowns */
 .more-dd{position:absolute;top:100%;right:0;margin-top:4px;background:var(--surface);border-radius:14px;box-shadow:0 4px 28px rgba(0,0,0,.18),0 0 0 .5px rgba(0,0,0,.06);padding:6px;z-index:100;min-width:160px;display:none;animation:ddPop .18s cubic-bezier(.32,1.2,.54,1);}
+.more-dd.dd-up{top:auto;bottom:100%;margin-top:0;margin-bottom:4px;}
 @keyframes ddPop{from{opacity:0;transform:scale(.9) translateY(4px)}to{opacity:1;transform:scale(1) translateY(0)}}
 .more-dd.open{display:block;}
 .dd-item{display:flex;align-items:center;gap:10px;width:100%;padding:11px 14px;border:none;background:none;font-family:inherit;font-size:14px;font-weight:500;color:var(--label);cursor:pointer;border-radius:10px;text-align:left;transition:background .12s;min-height:42px;}
@@ -1718,7 +1719,7 @@ async function handleDump(){const inp=document.getElementById('pTa'),btn=documen
    DROPDOWNS
    ══════════════════════════════════════════════ */
 let openDDId=null;
-function toggleDD(id,evt){if(evt)evt.stopPropagation();if(openDDId===id){closeAllDD();return;}closeAllDD();const el=document.getElementById('dd-'+id);if(el){el.classList.add('open');openDDId=id;const card=el.closest('.br, .d-card');if(card)card.classList.add('dd-active');}}
+function toggleDD(id,evt){if(evt)evt.stopPropagation();if(openDDId===id){closeAllDD();return;}closeAllDD();const el=document.getElementById('dd-'+id);if(el){el.classList.add('open');el.classList.remove('dd-up');openDDId=id;const card=el.closest('.br, .d-card');if(card)card.classList.add('dd-active');requestAnimationFrame(()=>{const r=el.getBoundingClientRect(),vh=innerHeight||document.documentElement.clientHeight;if(r.bottom>vh-8)el.classList.add('dd-up');});}}
 function toggleMoveSub(id,evt){if(evt)evt.stopPropagation();const el=document.getElementById('mv-'+id);if(el)el.classList.toggle('open');}
 function closeAllDD(){document.querySelectorAll('.more-dd.open').forEach(e=>e.classList.remove('open'));document.querySelectorAll('.dd-sub.open').forEach(e=>e.classList.remove('open'));document.querySelectorAll('.dd-active').forEach(e=>e.classList.remove('dd-active'));openDDId=null;}
 document.addEventListener('click',e=>{if(!e.target.closest('.bico-dots')&&!e.target.closest('.more-dd'))closeAllDD();});
