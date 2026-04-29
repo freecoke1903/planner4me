@@ -14,6 +14,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<!-- 모바일 터치 → HTML5 drag 이벤트 폴리필 -->
+<script src="https://cdn.jsdelivr.net/npm/mobile-drag-drop@2.3.0-rc.2/release/index.min.js"></script>
 <style>
 /* ══════ TOKENS ══════ */
 :root{--bg:#F2F2F7;--surface:#FFF;--blue:#007AFF;--gray:#E9E9EB;--label:#3C3C43;--sec:#8A8A8E;--sep:#C6C6C8;--grp:#F2F2F7;--red:#FF3B30;--green:#34C759;--orange:#FF9500;--purple:#AF52DE;
@@ -93,7 +95,7 @@ body.mode-popup .view-dash{display:none!important;}
 .bico-dots{font-weight:900;font-size:18px;}
 
 /* Dropdowns */
-.more-dd{position:absolute;bottom:100%;right:0;background:var(--surface);border-radius:14px;box-shadow:0 4px 28px rgba(0,0,0,.18),0 0 0 .5px rgba(0,0,0,.06);padding:6px;z-index:100;min-width:160px;display:none;animation:ddPop .18s cubic-bezier(.32,1.2,.54,1);}
+.more-dd{position:absolute;top:100%;right:0;margin-top:4px;background:var(--surface);border-radius:14px;box-shadow:0 4px 28px rgba(0,0,0,.18),0 0 0 .5px rgba(0,0,0,.06);padding:6px;z-index:100;min-width:160px;display:none;animation:ddPop .18s cubic-bezier(.32,1.2,.54,1);}
 @keyframes ddPop{from{opacity:0;transform:scale(.9) translateY(4px)}to{opacity:1;transform:scale(1) translateY(0)}}
 .more-dd.open{display:block;}
 .dd-item{display:flex;align-items:center;gap:10px;width:100%;padding:11px 14px;border:none;background:none;font-family:inherit;font-size:14px;font-weight:500;color:var(--label);cursor:pointer;border-radius:10px;text-align:left;transition:background .12s;min-height:42px;}
@@ -645,6 +647,18 @@ body.view-week.mode-popup .p-week{display:flex;}
 <div class="toast" id="toast"></div>
 
 <script>
+/* ══════════════════════════════════════════════
+   MOBILE DRAG-DROP POLYFILL (touch → HTML5 drag)
+   ══════════════════════════════════════════════ */
+if(typeof MobileDragDrop!=='undefined'){
+  MobileDragDrop.polyfill({
+    holdToDrag:300, // 300ms 길게 눌러야 드래그 시작 (스크롤과 구분)
+    dragImageTranslateOverride:MobileDragDrop.scrollBehaviourDragImageTranslateOverride
+  });
+  // 터치 스크롤 보존 (passive 옵션 명시)
+  window.addEventListener('touchmove',function(){},{passive:false});
+}
+
 /* ══════════════════════════════════════════════
    MODE DETECTION
    ══════════════════════════════════════════════ */
