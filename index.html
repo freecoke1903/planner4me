@@ -93,6 +93,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Helvetica Neue'
   .manual-card{padding:44px 32px 28px;}
   .manual-h{font-size:24px;}
 }
+.welcome-card{padding:36px 28px 28px;background:var(--surface);border-radius:20px;box-shadow:var(--shL);text-align:center;}
+.welcome-h{font-size:24px;font-weight:700;letter-spacing:-.3px;margin:18px 0 14px;color:var(--label);}
+.welcome-desc{font-size:14.5px;line-height:1.65;color:var(--label);margin-bottom:22px;font-weight:500;}
+.welcome-ta{width:100%;padding:14px 16px;border:1px solid var(--sep);border-radius:12px;font-family:inherit;font-size:15px;line-height:1.5;color:var(--label);outline:none;background:var(--grp);resize:none;min-height:62px;max-height:140px;transition:border-color .2s,background .2s;margin-bottom:18px;}
+.welcome-ta:focus{border-color:var(--blue);background:var(--surface);}
+.welcome-ta::placeholder{color:#C7C7CC;}
+.welcome-acts{display:flex;flex-direction:column;gap:8px;}
+.welcome-start-btn{padding:13px 24px;font-size:15px;}
+.welcome-start-btn:disabled{opacity:.45;cursor:not-allowed;}
 
 /* ══════ VIEW A: POPUP ══════ */
 .view-popup{display:none;height:100%;height:100dvh;flex-direction:column;}
@@ -556,16 +565,17 @@ body.view-week.mode-popup .p-week{display:flex;}
   </div>
 </div>
 
-<!-- ══════ ONBOARDING: WELCOME (Phase 4에서 디자인) ══════ -->
+<!-- ══════ ONBOARDING: WELCOME (입력창 + 첫 카드 자동 등록) ══════ -->
 <div class="ob-ov hidden" id="welcomeOv">
   <div class="ob-content">
-    <div class="ob-placeholder">
+    <div class="welcome-card">
       <div class="ob-emoji">☀️</div>
-      <h2>환영합니다 (placeholder)</h2>
-      <p>Phase 4에서 입력창 + 첫 카드 자동 등록 추가.</p>
-      <div class="ob-acts">
-        <button class="ob-btn-sec" onclick="finishOnboarding()">일단 둘러볼게요</button>
-        <button class="ob-btn-pri" onclick="finishOnboarding()">시작하기</button>
+      <h2 class="welcome-h">환영합니다.</h2>
+      <p class="welcome-desc">처음이라 어색해도 괜찮아요.<br>머릿속에 떠오르는 거 아무거나<br>한 줄 적어보세요.</p>
+      <textarea class="welcome-ta" id="welcomeInput" placeholder="대충 적어도 돼요" rows="2"></textarea>
+      <div class="welcome-acts">
+        <button class="ob-btn-pri welcome-start-btn" id="welcomeStartBtn" onclick="welcomeStart()" disabled>적었어요! 시작하기</button>
+        <button class="ob-btn-sec welcome-skip-btn" onclick="welcomeSkip()">일단 둘러볼게요</button>
       </div>
     </div>
   </div>
@@ -1824,13 +1834,42 @@ function showWelcome(){
   // 매뉴얼 재시청 모드면 웰컴 건너뛰고 바로 앱
   if(_manualReplayMode){_manualReplayMode=false;showApp();return;}
   hideAllOnboarding();hideAppOnly();
+  // 입력창 리셋 + 시작 버튼 비활성화
+  const ta=document.getElementById('welcomeInput'),btn=document.getElementById('welcomeStartBtn');
+  if(ta)ta.value='';
+  if(btn)btn.disabled=true;
   document.getElementById('welcomeOv').classList.remove('hidden');
+  if(ta)setTimeout(()=>ta.focus(),300);
 }
 function finishOnboarding(){
   markOnboarded();
   showApp();
 }
 function showManualReplay(){showManual(true);}
+
+async function welcomeStart(){
+  const ta=document.getElementById('welcomeInput');
+  const btn=document.getElementById('welcomeStartBtn');
+  const text=(ta?ta.value:'').trim();
+  if(!text)return;
+  if(btn)btn.disabled=true;
+  // 첫 카드 자동 등록 (category:'today', AI 분류 X — 단순 박아넣기)
+  if(CU&&!PREVIEW_BYPASS){
+    try{
+      const id=db.collection('tasks').doc().id;
+      await db.collection('tasks').doc(id).set({
+        id,text,category:'today',tag:'',target_date:null,
+        done:false,doneAt:null,createdAt:new Date().toISOString(),
+        uid:CU.uid,contextMemo:''
+      });
+    }catch(e){
+      console.error('[welcomeStart]',e);
+      showToast('저장 실패. 그래도 시작합니다.');
+    }
+  }
+  finishOnboarding();
+}
+function welcomeSkip(){finishOnboarding();}
 
 if(PREVIEW_BYPASS){
   // 미리보기/시연 모드 — onboarding 스킵하고 바로 앱
@@ -2931,6 +2970,14 @@ if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.s
     if(Math.abs(dx)<40||Math.abs(dy)>Math.abs(dx))return; // 가로 임계 + 세로 우세시 무시
     if(dx<0)manualNext();else manualPrev();
   },{passive:true});
+})();
+
+// 웰컴 입력창 — 텍스트 있을 때만 시작 버튼 활성
+(()=>{
+  const ta=document.getElementById('welcomeInput'),btn=document.getElementById('welcomeStartBtn');
+  if(!ta||!btn)return;
+  ta.addEventListener('input',()=>{btn.disabled=!ta.value.trim();});
+  ta.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();if(!btn.disabled)welcomeStart();}});
 })();
 </script>
 </body>
